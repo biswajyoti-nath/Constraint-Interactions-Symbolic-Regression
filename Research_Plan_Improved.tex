@@ -1,0 +1,475 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,tabularx,longtable}
+\usepackage{graphicx,xcolor}
+\usepackage{hyperref}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{caption}
+
+\definecolor{accent}{HTML}{2563EB}
+\definecolor{codebg}{HTML}{F8FAFC}
+\definecolor{synergy}{HTML}{16A34A}
+\definecolor{redundancy}{HTML}{DC2626}
+
+\hypersetup{colorlinks=true,linkcolor=accent,citecolor=accent,urlcolor=accent}
+
+\lstset{
+  language=Python, basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg}, frame=single,
+  rulecolor=\color{gray!30}, breaklines=true,
+  keywordstyle=\color{accent}\bfseries,
+  commentstyle=\color{gray},
+  numbers=left, numberstyle=\tiny\color{gray},
+  xleftmargin=2em, framexleftmargin=1.5em
+}
+
+\tcbuselibrary{skins,breakable}
+\newtcolorbox{notebox}[1][]{
+  colback=accent!5, colframe=accent!60, fonttitle=\bfseries,
+  title=#1, breakable, sharp corners=south
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{gray}{Research Plan — Constraint-Interaction Metric}}
+\fancyhead[R]{\small\textcolor{gray}{Biswajyoti Nath}
+\fancyfoot[C]{\thepage}
+
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+
+\title{%
+  \vspace{-1cm}
+  {\LARGE\bfseries\color{accent} Research Plan}\\[0.3cm]
+  {\Large Constraint-Interaction Metric for Symbolic Regression}\\[0.5cm]
+  {\normalsize\textit{Summer Research Project — July 6–28, 2026}}
+}
+\author{%
+  \textbf{Biswajyoti Nath}\\
+  Department of Computer Science \& Engineering\\
+  Assam Science and Technology University
+}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+We propose a \textbf{constraint-interaction metric} $M(i,j)$ for symbolic regression (SR) that quantifies whether pairs of search constraints act synergistically ($M>1$), redundantly ($M<1$), or independently ($M\approx1$). The metric is defined as $M(i,j) = \rho(C_i \wedge C_j)/[\rho(C_i)\rho(C_j)]$, where $\rho(C)$ is the fraction of grammatically valid expressions satisfying constraint $C$. We will build a prototype system integrating a grammar-based expression generator, Monte Carlo density estimation, and PySR-based experiments on Feynman physics benchmarks. Deliverables include an open-source code repository, a 55--65 page implementation handbook, and empirical evidence that $M$ predicts performance gains (target: Pearson $r > 0.6$, $p < 0.05$). Timeline: 23 working days (July 6--28, 2026).
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%% ======================================================================
+\section{Goals and Scope}
+\label{sec:goals}
+
+\subsection{Primary Goals}
+\begin{enumerate}[label=\textbf{G\arabic*}]
+  \item Formally define $\rho(C)$ and the interaction coefficient $M(i,j)$.
+  \item Implement efficient Monte Carlo algorithms to estimate these probabilities.
+  \item Embed the framework in a symbolic regression workflow using PySR.
+  \item Empirically validate that $M$ predicts how constraint combinations affect search performance.
+\end{enumerate}
+
+\subsection{Scope}
+Given the 23-day timeline, we target a \textbf{focused prototype} producing convincing initial results suitable for a workshop or short conference submission. Specifically:
+\begin{itemize}
+  \item A working system: data generators, metric calculator, experiment scripts.
+  \item A moderate experiment set: 3--4 datasets, 4--5 constraint types, key pairwise combinations.
+  \item Target: demonstrate $M(i,j)$ correlates with performance gains (Pearson $r > 0.6$, $p < 0.05$ after FDR correction) across representative SR problems.
+\end{itemize}
+
+\subsection{Deliverables}
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Deliverable} & \textbf{Format} \\
+\midrule
+Implementation handbook & \texttt{Handbook.pdf} (55--65 pages) \\
+Code repository & GitHub (Python modules, notebooks) \\
+Sample datasets & \texttt{data/} folder (CSV) \\
+Figures and results & \texttt{figures/}, \texttt{results/} (PNG/CSV) \\
+README \& CI & \texttt{README.md}, \texttt{.github/workflows/ci.yml} \\
+\bottomrule
+\end{tabularx}
+\caption{Project deliverables.}
+\end{table}
+
+%% ======================================================================
+\section{Background and Related Work}
+\label{sec:background}
+
+Symbolic regression (SR) discovers interpretable mathematical expressions fitting data. It is NP-hard due to the combinatorial search space. Researchers use \textit{constraints}---grammar rules, type systems, operator whitelists, dimensional analysis---to incorporate domain knowledge and reduce search effort.
+
+\subsection{Prior Work on Constraints in SR}
+\begin{itemize}
+  \item \textbf{Grammar-based SR:} Attribute grammars enforcing dimensional consistency recovered ${\sim}60\%$ more benchmark equations~(Brence et al., 2023).
+  \item \textbf{Semantic backpropagation:} Reissmann et al.\ (2025) use semantic constraints during evolution in GEP.
+  \item \textbf{Graph-based SR:} Xiang et al.\ (2025) encode constraints into neural-guided MCTS.
+  \item \textbf{PySR:} State-of-the-art open-source SR using multi-population evolutionary search (Cranmer, 2023).
+\end{itemize}
+
+\subsection{Research Gap}
+\begin{notebox}[Novelty Statement]
+All prior work studies individual constraint effectiveness. \textbf{No existing work models pairwise statistical interaction between constraints as a predictive signal for search performance.} Our metric $M(i,j)$ fills this gap. While analogous to ``lift'' in association rule mining, the application to structured expression grammars---where co-occurrence is measured over a \textit{generative} distribution rather than an observed corpus---is novel in the SR literature.
+\end{notebox}
+
+%% ======================================================================
+\section{Proposed Metric}
+\label{sec:metric}
+
+\subsection{Definitions}
+Let $\mathcal{E}$ be the space of expressions generated by grammar $G$. For a constraint $C: \mathcal{E} \to \{0,1\}$, define:
+\begin{equation}
+  \rho(C) \;=\; \Pr_{E \sim G}[C(E) = 1]
+\end{equation}
+
+The \textbf{interaction coefficient} for constraints $C_i, C_j$ is:
+\begin{equation}
+  \boxed{M(i,j) \;=\; \frac{\rho(C_i \wedge C_j)}{\rho(C_i)\,\rho(C_j)}}
+  \label{eq:metric}
+\end{equation}
+
+\subsection{Interpretation}
+\begin{itemize}
+  \item $M(i,j) > 1$: \textcolor{synergy}{\textbf{Synergy}} --- constraints co-occur more than chance; combining them may yield super-additive gains.
+  \item $M(i,j) < 1$: \textcolor{redundancy}{\textbf{Redundancy}} --- one constraint subsumes the other; adding the second provides diminishing returns.
+  \item $M(i,j) = 1$: \textbf{Independence} --- constraints act on orthogonal dimensions.
+\end{itemize}
+
+\subsection{Statistical Significance of Interaction}
+Rather than using arbitrary thresholds ($M > 1.1$, $M < 0.9$), we determine significance via a bootstrap confidence interval. Under the null hypothesis of independence, $M = 1$. We:
+\begin{enumerate}
+  \item Bootstrap-resample the expression set $B = 1000$ times.
+  \item Compute $\hat{M}^{(b)}$ for each resample.
+  \item Construct a 95\% CI for $M$. If $1 \notin \text{CI}$, reject independence.
+\end{enumerate}
+
+%% ======================================================================
+\section{Data Generation}
+\label{sec:datagen}
+
+\subsection{Grammar-Based Expression Generator}
+We use a context-free grammar in BNF:
+\begin{lstlisting}[language={},frame=none,backgroundcolor=\color{white}]
+<expr> ::= <expr> <binop> <expr>
+         | <unop>(<expr>)
+         | <variable> | <constant>
+<binop> ::= + | - | *
+<unop>  ::= sin | cos
+<variable> ::= x | y
+<constant> ::= 1 | 2 | ... | 9
+\end{lstlisting}
+
+A recursive generator applies grammar rules up to \texttt{max\_depth}. Division is excluded from the default grammar to avoid domain errors; it can be added as a configurable extension.
+
+\subsection{Sampling Strategy}
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Rationale} \\
+\midrule
+Grammar depth limit & 8 & Moderate complexity \\
+Operators & $+, -, \times, \sin, \cos$ & Core arithmetic + trig \\
+Variables & $x, y$ & Two-input functions \\
+Constants & $\pm 1 \ldots 9$ & Discrete values \\
+Sample size $N$ & 100{,}000 & $\rho \sim 0.01 \Rightarrow {\sim}1000$ hits, SE ${\sim}3\%$ \\
+Stratification & Equal samples per depth 2,4,6,8 & Avoid depth bias \\
+\bottomrule
+\end{tabular}
+\caption{Monte Carlo sampling parameters.}
+\end{table}
+
+Each expression string is converted to a SymPy object via \texttt{sympify()}, with invalid expressions (syntax errors, domain violations) discarded and replaced.
+
+%% ======================================================================
+\section{Constraint Definitions}
+\label{sec:constraints}
+
+We implement five constraints $C(E)$, designed to be \textbf{structurally distinct}:
+
+\begin{enumerate}[label=\textbf{C\arabic*}]
+  \item \textbf{Structural Template ($C_{\mathrm{struct}}$):} The expression must conform to a structural pattern---e.g., no nested trigonometric calls, at most 2 consecutive binary operations. This is checked by traversing the SymPy AST.
+
+  \item \textbf{Maximum Depth ($C_{\mathrm{depth}}$):} Parse-tree depth $\le$ threshold (default: 6). Recursive depth computation on \texttt{sym\_expr}.
+
+  \item \textbf{Operator Whitelist ($C_{\mathrm{op}}$):} Only operators from a prescribed set (e.g., $\{+, -, \times\}$) may appear. Every AST node is verified against the whitelist.
+
+  \item \textbf{Positivity ($C_{\mathrm{pos}}$):} The expression evaluates to $\ge 0$ for all inputs in $[-10, 10]^2$. We test on \textbf{200 random points} (not 10) and report the empirical false-positive rate: $P(\text{pass} \mid \text{violates}) \le (0.95)^{200} < 10^{-4}$ if 5\% of the domain violates.
+
+  \item \textbf{Dimensional Consistency ($C_{\mathrm{dim}}$, optional):} Each variable carries a physical dimension; we propagate units through operations and reject inconsistencies (e.g., $\text{length} + \text{time}$). Skipped if time is short.
+\end{enumerate}
+
+\begin{notebox}[Design Decision: C1 vs.\ C3]
+$C_{\mathrm{struct}}$ and $C_{\mathrm{op}}$ are intentionally distinct: the former constrains \textit{tree shape} (nesting patterns), the latter constrains \textit{node labels} (which operators appear). Their $M$ value is therefore non-trivial.
+\end{notebox}
+
+%% ======================================================================
+\section{Monte Carlo Estimation}
+\label{sec:montecarlo}
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwIn{Grammar $G$, constraints $\{C_1, \ldots, C_k\}$, sample size $N$}
+\KwOut{Densities $\hat{\rho}(C_i)$, joint densities $\hat{\rho}(C_i \wedge C_j)$, matrix $M$}
+Initialize counters $n_i \gets 0$, $n_{ij} \gets 0$\;
+\For{$t = 1$ \KwTo $N$}{
+  $E \gets \texttt{generate\_expr}(G, \texttt{max\_depth}=8)$\;
+  $s \gets \texttt{sympify}(E)$\;
+  \If{$s$ is invalid}{\textbf{continue} (replace sample)\;}
+  \For{$i = 1$ \KwTo $k$}{
+    \If{$C_i(s)$}{$n_i \gets n_i + 1$\;}
+    \For{$j = i+1$ \KwTo $k$}{
+      \If{$C_i(s) \wedge C_j(s)$}{$n_{ij} \gets n_{ij} + 1$\;}
+    }
+  }
+}
+$\hat{\rho}(C_i) \gets n_i / N$\;
+$\hat{\rho}(C_i \wedge C_j) \gets n_{ij} / N$\;
+$M(i,j) \gets \hat{\rho}(C_i \wedge C_j) / [\hat{\rho}(C_i) \cdot \hat{\rho}(C_j)]$\;
+\Return{$\hat{\rho}, M$}
+\caption{Monte Carlo Constraint Density Estimation}
+\label{alg:montecarlo}
+\end{algorithm}
+
+\textbf{Parallelism:} Sampling is embarrassingly parallel. We use Python's \texttt{multiprocessing} or \texttt{joblib} to distribute across cores.
+
+\textbf{Convergence check:} Run at $N = 1\text{k}, 10\text{k}, 100\text{k}$ and verify $|\hat{\rho}_{100\text{k}} - \hat{\rho}_{10\text{k}}| < 0.01$.
+
+%% ======================================================================
+\section{Software Architecture}
+\label{sec:architecture}
+
+\subsection{Module Structure}
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Module} & \textbf{Responsibility} \\
+\midrule
+\texttt{expr\_generator.py} & Grammar-based recursive expression generation \\
+\texttt{constraints.py} & Constraint implementations (C1--C5) with unit tests \\
+\texttt{metric.py} & Monte Carlo sampling, $\rho$ estimation, $M$ computation \\
+\texttt{experiments.py} & PySR integration, experiment orchestration, logging \\
+\texttt{analysis.py} & Statistical analysis, correlation, regression, plotting \\
+\texttt{config.yaml} & All parameters (grammar, constraints, PySR, seeds) \\
+\texttt{main.py} & CLI entry point: \texttt{-{}-phase=\{metric,experiment,analysis\}} \\
+\bottomrule
+\end{tabularx}
+\caption{Module structure.}
+\end{table}
+
+\subsection{Configuration Schema}
+\begin{lstlisting}[caption={Minimal \texttt{config.yaml} schema.}]
+grammar:
+  max_depth: 8
+  operators: ["+", "-", "*", "sin", "cos"]
+  variables: ["x", "y"]
+monte_carlo:
+  N: 100000
+  stratify_by_depth: true
+pysr:
+  population_size: 40
+  niterations: 100
+  timeout_seconds: 300
+datasets: ["feynman_1", "feynman_2", "polynomial"]
+seeds: [42, 123, 456, 789, 1024]
+\end{lstlisting}
+
+\subsection{Testing Strategy}
+\begin{itemize}
+  \item \textbf{Unit tests:} Known pass/fail expressions for each constraint.
+  \item \textbf{Convergence test:} Assert $\rho$ stabilizes within 5\% between $N=10\text{k}$ and $N=100\text{k}$.
+  \item \textbf{Integration test:} End-to-end pipeline on a toy 3-operator grammar.
+\end{itemize}
+
+\subsection{Dependency Management}
+All dependencies pinned in \texttt{requirements.txt}:
+\texttt{pysr>=0.19}, \texttt{sympy==1.12}, \texttt{numpy>=1.24}, \texttt{scipy>=1.11}, \texttt{seaborn>=0.13}, \texttt{pandas>=2.0}.
+
+%% ======================================================================
+\section{Experimental Design}
+\label{sec:experiments}
+
+\subsection{Datasets}
+\begin{enumerate}[label=\textbf{D\arabic*}]
+  \item \textbf{Feynman-1:} Simple physics law (e.g., $E = mc^2$, kinetic energy).
+  \item \textbf{Feynman-2:} Multi-variable with trigonometry (e.g., projectile motion).
+  \item \textbf{Polynomial:} Synthetic 3-term polynomial.
+  \item \textbf{SRSD:} Dataset with dummy variable (Matsubara et al., 2024).
+\end{enumerate}
+
+\subsection{Constraint Scenarios}
+For each dataset, PySR is run under:
+\begin{itemize}
+  \item \textbf{Baseline:} No additional constraints.
+  \item \textbf{Singles:} Each of C1--C4 individually.
+  \item \textbf{Key pairs:} Pairs with extreme predicted $M$ values (highest synergy, highest redundancy).
+  \item \textbf{All constraints:} C1--C4 combined.
+\end{itemize}
+Each scenario uses \textbf{5 repeats} (fixed seeds) for statistical reliability.
+
+\subsection{Constraint Enforcement in PySR}
+Constraints are enforced \textbf{during search} via PySR's \texttt{constraints} and \texttt{nested\_constraints} parameters (for structural/operator constraints) and custom loss penalties (for positivity). This ensures the metric captures genuine search-effort reduction, not post-hoc filtering.
+
+\subsection{Success Criterion}
+Recovery is defined as: NED $< 0.1$ \textbf{or} relative MSE $< 10^{-6}$ on 20\% held-out data.
+
+\subsection{Metrics Recorded}
+\begin{itemize}
+  \item Wall-clock runtime (seconds)
+  \item Number of candidate evaluations
+  \item Recovery rate (binary)
+  \item Solution complexity (AST node count)
+\end{itemize}
+
+%% ======================================================================
+\section{Statistical Analysis}
+\label{sec:stats}
+
+\subsection{Speedup Definition}
+For constraint pair $(i,j)$, the \textbf{speedup} compares combined performance against the best single:
+\begin{equation}
+  \boxed{S(i,j) = \frac{\min(\text{evals}_{C_i},\; \text{evals}_{C_j})}{\text{evals}_{C_i \wedge C_j}}}
+  \label{eq:speedup}
+\end{equation}
+$S > 1$ means the combination outperforms either constraint alone.
+
+\subsection{Correlation Analysis}
+\begin{itemize}
+  \item Pearson and Spearman correlation between $M(i,j)$ and $S(i,j)$.
+  \item Linear regression: $S(i,j) = a + b \cdot M(i,j) + \varepsilon$. Significant positive $b$ ($p < 0.05$) supports predictive value.
+  \item \textbf{Multiple comparisons:} Benjamini--Hochberg FDR correction across all pairwise tests.
+\end{itemize}
+
+\subsection{Confidence Intervals}
+95\% bootstrap CIs for all mean metrics. Error bars on all plots.
+
+\subsection{Power Considerations}
+With $\binom{4}{2} \times 4 = 24$ (pair, dataset) data points, a power analysis (\texttt{statsmodels.stats.power}) confirms detectability of $r \ge 0.6$ at $\alpha = 0.05$ with power $> 0.80$.
+
+%% ======================================================================
+\section{Visualization Plan}
+\label{sec:viz}
+\begin{enumerate}
+  \item \textbf{Interaction Heatmap:} $M(i,j)$ matrix with \texttt{seaborn.heatmap}, annotated cells, coolwarm colormap.
+  \item \textbf{Scatter Plot:} $M(i,j)$ vs.\ $S(i,j)$ with regression line and $r$/$p$ annotation.
+  \item \textbf{Box Plots:} Runtime/evaluations per constraint scenario per dataset.
+  \item \textbf{Convergence Plot:} $\hat{\rho}(C)$ vs.\ sample size $N$.
+\end{enumerate}
+All generated with \texttt{matplotlib}/\texttt{seaborn}; publication-quality (300 DPI, vector where possible).
+
+%% ======================================================================
+\section{Potential Pitfalls and Mitigations}
+\label{sec:pitfalls}
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Risk} & \textbf{Impact} & \textbf{Mitigation} \\
+\midrule
+Sampling noise for rare $\rho$ & Inaccurate $M$ & Increase $N$; report bootstrap CIs \\
+Generator $\neq$ search distribution & $M$ may not transfer & Compare with PySR gen-0 population \\
+SymPy edge cases & Constraint bugs & Unit tests on known expressions \\
+PySR stochasticity & Wide CIs & 5 repeats; fix seeds \\
+PySR installation failure & Blocked experiments & Fallback to \texttt{gplearn} \\
+Timeline slippage & Incomplete deliverables & 2 buffer days; cut $C_{\mathrm{dim}}$ first \\
+\bottomrule
+\end{tabularx}
+\caption{Risk register.}
+\end{table}
+
+%% ======================================================================
+\section{Timeline}
+\label{sec:timeline}
+
+\begin{longtable}{clp{9cm}c}
+\toprule
+\textbf{Day} & \textbf{Date} & \textbf{Tasks} & \textbf{Hours} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Day} & \textbf{Date} & \textbf{Tasks} & \textbf{Hours} \\
+\midrule
+\endhead
+1 & Jul 6 & Setup env; install Julia+PySR; review literature; begin generator & 6 \\
+2 & Jul 7 & Finish generator; SymPy integration; depth-limit tests & 8 \\
+3 & Jul 8 & Monte Carlo sampling; validity checks; benchmark 1k samples & 8 \\
+4 & Jul 9 & Implement C1 (structural), C2 (depth), C3 (operator) & 7 \\
+5 & Jul 10 & Implement C4 (positivity, 200 pts); optional C5 (dimensional) & 8 \\
+6 & Jul 11 & Full Monte Carlo run ($N{=}100\text{k}$); convergence check & 8 \\
+7 & Jul 12 & Compute $M$ matrix; heatmap visualization; identify patterns & 6 \\
+8 & Jul 13 & Document theory ($\rho$, $M$, bootstrap CI); write handbook \S1--4 & 7 \\
+9 & Jul 14 & Software architecture; module APIs; pseudocode in handbook & 6 \\
+10 & Jul 15 & PySR setup; prepare benchmark datasets; data loading scripts & 6 \\
+11 & Jul 16 & Integrate constraints with PySR API; plan enforcement strategy & 7 \\
+12 & Jul 17 & Baseline SR experiments (no constraints); debug; store results & 8 \\
+13 & Jul 18 & Single-constraint experiments (5 repeats each); log metrics & 8 \\
+14 & Jul 19 & Pair and all-constraint experiments; focus on extreme $M$ pairs & 8 \\
+15 & Jul 20 & Statistical analysis: means, CIs, correlations, FDR correction & 6 \\
+16 & Jul 21 & Ablation studies; begin drafting Results chapter & 6 \\
+17 & Jul 22 & Create all figures (heatmap, scatter, boxplots) & 7 \\
+18 & Jul 23 & Write Experiments \& Results chapters & 8 \\
+19 & Jul 24 & Write Implementation Details chapter & 8 \\
+20 & Jul 25 & Write Data Generation \& Constraints chapters & 7 \\
+21 & Jul 26 & \textit{Buffer day:} catch-up on any delayed tasks & 6 \\
+22 & Jul 27 & Finalize writing; proofread; compile handbook PDF & 6 \\
+23 & Jul 28 & \textit{Buffer + submit:} final polish, push repo, CI, README & 4 \\
+\bottomrule
+\caption{Daily timeline (July 6--28, 2026). Days 21 and 23 are buffer days.}
+\end{longtable}
+
+%% ======================================================================
+\section{Handbook Outline}
+\label{sec:handbook}
+
+Target: \textbf{55--65 pages}, ${\sim}25{,}000$ words.
+
+\begin{enumerate}
+  \item Cover Page (0.5 p.)
+  \item Abstract \& Executive Summary (1 p.)
+  \item Table of Contents (1 p.)
+  \item Ch.\ 1: Introduction (2 p.) --- SR background, motivation, contributions.
+  \item Ch.\ 2: Related Work (3 p.) --- SR techniques, constraints, benchmarks.
+  \item Ch.\ 3: Problem Definition (2 p.) --- Formal $M(i,j)$, research questions.
+  \item Ch.\ 4: Proposed Metric (4 p.) --- Derivation, interpretation, bootstrap CI.
+  \item Ch.\ 5: Software Architecture (5 p.) --- Modules, data flow, config schema.
+  \item Ch.\ 6: Data \& Expression Generation (4 p.) --- Grammar, sampling, stratification.
+  \item Ch.\ 7: Constraint Definitions (4 p.) --- Formal + implementation.
+  \item Ch.\ 8: Monte Carlo Estimation (3 p.) --- Algorithm, convergence, parallelism.
+  \item Ch.\ 9: PySR Integration (4 p.) --- API usage, constraint enforcement.
+  \item Ch.\ 10: Experimental Protocol (4 p.) --- Datasets, experiment matrix, metrics.
+  \item Ch.\ 11: Statistical Methods (3 p.) --- Correlation, regression, FDR, power.
+  \item Ch.\ 12: Results (5 p.) --- Heatmap, scatter plots, tables.
+  \item Ch.\ 13: Discussion (4 p.) --- Interpretation, limitations.
+  \item Ch.\ 14: Conclusion \& Future Work (2 p.)
+  \item Appendices (4 p.) --- Code listings, extended tables.
+\end{enumerate}
+
+%% ======================================================================
+\section*{References}
+
+\begin{enumerate}[label={[\arabic*]},leftmargin=*]
+  \item M.\ Reissmann et al., ``Constraining Genetic Symbolic Regression via Semantic Backpropagation,'' \textit{Genetic Programming and Evolvable Machines}, 2025.
+  \item Y.\ Xiang et al., ``Graph-based Symbolic Regression with Invariance and Constraint Encoding,'' \textit{NeurIPS}, 2025.
+  \item M.\ Cranmer, ``Interpretable Machine Learning for Science with PySR and SymbolicRegression.jl,'' \textit{arXiv:2305.01582}, 2023.
+  \item J.\ Brence et al., ``Dimensionally-consistent equation discovery through probabilistic attribute grammars,'' \textit{Information Sciences}, vol.\ 632, 2023.
+  \item Y.\ Matsubara et al., ``Rethinking Symbolic Regression Datasets and Benchmarks for Scientific Discovery,'' \textit{J.\ Data-centric Machine Learning Research}, 2024.
+  \item J.\ Martin and M.\ Burnett, ``Shape-Constrained Symbolic Regression---Improving Extrapolation,'' in \textit{GECCO}, 2014.
+  \item PySR Documentation and GitHub, 2023. \url{https://ai.damtp.cam.ac.uk/pysr/}
+\end{enumerate}
+
+\end{document}
