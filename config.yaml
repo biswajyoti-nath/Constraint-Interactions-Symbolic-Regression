@@ -1,0 +1,55 @@
+# Constraint-Interaction Metric Configuration
+# =============================================
+
+grammar:
+  max_depth: 8
+  operators:
+    binary: ["+", "-", "*"]
+    unary: ["sin", "cos"]
+  variables: ["x", "y"]
+  constants:
+    min: 1
+    max: 9
+
+monte_carlo:
+  N: 100000
+  stratify_by_depth: true
+  depths: [2, 4, 6, 8]
+  random_seed: 42
+
+constraints:
+  structural:
+    max_nested_trig: 1          # no nested sin(cos(...))
+    max_consecutive_binary: 3
+  depth:
+    limit: 6
+  operator_whitelist:
+    allowed: ["+", "-", "*"]    # no trig
+  positivity:
+    n_test_points: 200
+    domain: [-10, 10]
+  dimensional:
+    enabled: false              # optional, skip if time-constrained
+    variables:
+      x: "length"
+      y: "time"
+
+pysr:
+  population_size: 40
+  niterations: 100
+  timeout_seconds: 300
+  maxsize: 25
+  binary_operators: ["+", "-", "*", "/"]
+  unary_operators: ["sin", "cos", "exp", "log"]
+
+datasets:
+  - name: "feynman_1"
+    description: "Kinetic energy: 0.5 * m * v^2"
+  - name: "feynman_2"
+    description: "Coulomb's law: q1*q2 / (4*pi*eps*r^2)"
+  - name: "polynomial"
+    description: "Synthetic 3-term polynomial"
+
+experiments:
+  repeats: 5
+  seeds: [42, 123, 456, 789, 1024]
