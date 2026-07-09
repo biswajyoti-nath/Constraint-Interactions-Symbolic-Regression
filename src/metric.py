@@ -38,8 +38,12 @@ class RhoResult:
         rho_ij: 2-D array of shape (k, k). rho_ij[i][j] = ρ(C_i ∧ C_j).
             Upper triangle is filled by the estimator; lower triangle is
             mirrored by InteractionMatrix.
-        N_actual: number of valid expressions that were drawn.
-        stats: generator stats dict captured after sampling.
+        N_actual: number of valid expressions collected. The estimator's
+            while-loop retries None draws silently, so N_actual is always
+            exactly equal to the requested N. Attempted-vs-valid transparency
+            is exposed via stats['generated'] (total draw attempts, including
+            retries) and stats['returned_none'] (exhausted-retry failures).
+        stats: generator stats dict captured after sampling (DESIGN_CONTEXT §4).
     """
 
     rho_i: np.ndarray
@@ -62,7 +66,8 @@ class DensityEstimator:
     DESIGN_CONTEXT §6.3 invariants enforced here:
     - reset_stats() called before sampling.
     - generator.stats logged after sampling.
-    - N_actual tracked separately from attempted draws.
+    - N_actual == N always (while-loop retries None draws; see RhoResult docs).
+    - stats['generated'] exposes total draw attempts for transparency.
 
     Args:
         generator: A configured GrammarGenerator instance.
@@ -71,9 +76,11 @@ class DensityEstimator:
 
     Example:
         >>> import pathlib, sys
-        >>> sys.path.insert(0, str(pathlib.Path('.').resolve() / 'src'))
+        >>> _src = pathlib.Path(__file__).resolve().parent
+        >>> _cfg = _src.parent / 'config.yaml'
+        >>> sys.path.insert(0, str(_src))
         >>> from expr_generator import GrammarGenerator
-        >>> gen = GrammarGenerator()
+        >>> gen = GrammarGenerator(str(_cfg))
         >>> est = DensityEstimator(gen, max_depth=3)
         >>> always_true = lambda e: True
         >>> result = est.estimate([always_true], N=50)
@@ -88,14 +95,17 @@ class DensityEstimator:
     def estimate(self, constraints: list, N: int) -> RhoResult:
         """Draw N valid expressions and count constraint hits.
 
+        The while-loop retries None draws silently, so N_actual is always
+        exactly N. Transparency into draw attempts is via stats['generated']
+        (total attempts) and stats['returned_none'] (exhausted retries).
+
         Args:
             constraints: List of callables ``sympy.Expr → bool``.
                 Each must be a pure function (DESIGN_CONTEXT §6.2).
-            N: Target number of valid expressions. Actual count may be
-                slightly lower if the generator returns None for a draw.
+            N: Exact number of valid expressions to collect.
 
         Returns:
-            RhoResult with rho_i, rho_ij, N_actual, and generator stats.
+            RhoResult with rho_i, rho_ij, N_actual=N, and generator stats.
         """
         k = len(constraints)
         n_i = np.zeros(k, dtype=int)
@@ -214,19 +224,31 @@ class BootstrapCI:
         self.rng = np.random.default_rng(seed)
 
     def compute(
-        self, expressions: list, constraints: list, generator: GrammarGenerator
+        self,
+        expressions: list,
+        constraints: list,
+        grammar_config: dict | None = None,
     ) -> np.ndarray:
         """Compute 95% CI for each M(i,j) via bootstrap resampling.
 
         Args:
             expressions: Pre-drawn list of sympy.Expr objects.
             constraints: List of constraint callables.
-            generator: Generator instance (used only for config access).
+            grammar_config: The grammar section of config.yaml
+                (``generator.config``). When provided, it is embedded in the
+                returned metadata for reproducibility (DESIGN_CONTEXT §9).
+                Pass ``None`` to skip this (e.g., in unit tests).
 
         Returns:
             ndarray of shape (k, k, 2) where [..., 0] is the lower bound
             and [..., 1] is the upper bound of the 95% CI.
+
+        Note:
+            The ``grammar_config`` dict is stored on the instance as
+            ``self.grammar_config`` after the call, so callers can log it
+            alongside results without re-passing it.
         """
+        self.grammar_config = grammar_config  # §9: snapshot for reproducibility
         k = len(constraints)
         n = len(expressions)
         m_samples = np.full((self.B, k, k), np.nan)
