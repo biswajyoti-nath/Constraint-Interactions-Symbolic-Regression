@@ -94,13 +94,15 @@ Each constraint C must:
   without raising — return False if invalid
 - Be independent of other constraints (no shared mutable state)
 
-### 6.3 Metric (`metric.py`) — TODO
+### 6.3 Metric (`metric.py`) — Implemented
 
-- Must call `generator.reset_stats()` before each sampling run
-- Must log `generator.stats` after each run
-- M(i,j) must be symmetric: M(i,j) == M(j,i)
-- Must report bootstrap CIs alongside point estimates
-- Must handle ρ = 0 gracefully (undefined M → reported as NaN, not crash)
+- Must call `generator.reset_stats()` before each sampling run (✓ enforced in `DensityEstimator.estimate()`).
+- Must log `generator.stats` after each run (✓ stored in `RhoResult.stats`).
+- M(i,j) must be symmetric: M[i][j] == M[j][i] (✓ explicit mirror loop in `InteractionMatrix.compute()`).
+- Must report bootstrap CIs alongside point estimates (✓ `BootstrapCI.compute()`).
+- Must handle ρ = 0 gracefully (✓ M → NaN, not crash; NaN mirrored to lower triangle).
+- `N_actual` == requested `N` always (✓ while-loop retries None draws; see `RhoResult` docstring).
+- `grammar_config` can be passed to `BootstrapCI.compute()` for §9 reproducibility snapshotting.
 
 ### 6.4 Experiments (`experiments.py`) — TODO
 

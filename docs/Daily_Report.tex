@@ -1,0 +1,53 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\title{\textbf{Daily Progress \& Next Steps Plan}\\
+\large Constraint-Interaction Metric for Symbolic Regression}
+\author{Biswajyoti Nath \and Subinoy Nath}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Part 1: Summary of Today's Work (Expression Generator)}
+Today's focus was on transforming the stochastic expression generator from a rough prototype into a mathematically rigorous, fully documented, and robust foundation.
+
+\begin{itemize}
+    \item \textbf{Mathematical Rigor \& Domain Safety:} Discovered that \texttt{sympify(evaluate=False)} silently parsed mathematically invalid expressions (e.g., division by zero). We implemented a two-pass system: parsing followed by a numeric probe (\texttt{\_validate\_domain}) that strictly filters out NaN, infinity, and complex domain violations.
+    \item \textbf{Stratified Sampling:} The original pure stochastic process failed to consistently reach deep trees. We implemented \texttt{generate\_stratified()} and \texttt{generate\_at\_depth()} to guarantee uniform representation across depth buckets, which is vital for unbiased Monte Carlo density estimation.
+    \item \textbf{Complete Reproducibility:} Isolated the global Python random state into a local instance (\texttt{self.rng}) driven strictly by the seed defined in \texttt{config.yaml}. We also introduced strict statistics tracking to monitor rejection rates.
+    \item \textbf{Formal Specifications:} Upgraded the informal design notes into a formal \texttt{DESIGN\_CONTEXT.md} that mathematically defines the probability space, outlines strict module invariants, and establishes a reproducibility contract.
+    \item \textbf{Gold-Standard Documentation \& Testing:} Executed the \texttt{code-documenter} and \texttt{codebase-documenter} protocols. We injected executable \texttt{doctest} examples, generated \texttt{API.md} and \texttt{ARCHITECTURE.md}, and wrote a 16-test suite that passes with 100\% success. The codebase was formatted entirely using \texttt{ruff}.
+\end{itemize}
+
+\section*{Part 2: Strict Plan for Tomorrow}
+With the \texttt{expr\_generator} robust and fully documented, tomorrow's efforts will focus on implementing the \textbf{Constraint Evaluators} and the \textbf{Monte Carlo Estimator}.
+
+\subsection*{Phase 1: Implement Constraints (\texttt{src/constraints.py})}
+We will build pure, deterministic Python functions that adhere strictly to the invariants defined in \texttt{DESIGN\_CONTEXT.md}.
+\begin{enumerate}[label=C\arabic*.]
+    \item \textbf{Structural Constraints}: Ensuring specific variable presence or polynomial shapes.
+    \item \textbf{Depth Constraints}: Filtering ASTs that exceed strict complexity limits.
+    \item \textbf{Operator Whitelists}: Validating that only subset operators (e.g., \{+, *, sin\}) exist in the tree.
+    \item \textbf{Positivity Constraints}: Ensuring the domain of the expression is strictly non-negative.
+    \item \textbf{Dimensional Constraints}: Enforcing specific physical dimensional consistency on the AST leaves.
+\end{enumerate}
+\textit{Invariant check:} All constraint functions must not mutate the SymPy AST and must gracefully handle constants and nested edge-cases.
+
+\subsection*{Phase 2: Implement Interaction Metric (\texttt{src/metric.py})}
+Once constraints are ready, we will construct the Monte Carlo density estimator.
+\begin{itemize}
+    \item \textbf{Ingestion:} Consume $N$ stratified expressions from \texttt{expr\_generator.py}.
+    \item \textbf{Evaluation:} Calculate $\rho(C_i)$, $\rho(C_j)$, and the joint probability $\rho(C_i \wedge C_j)$ for all pairs.
+    \item \textbf{Interaction Calculation:} Compute the final coefficient matrix $M(i,j) = \frac{\rho(C_i \wedge C_j)}{\rho(C_i)\rho(C_j)}$.
+    \item \textbf{Statistical Rigor:} Implement bootstrap resampling ($B=1000$) to attach 95\% confidence intervals to every $M(i,j)$ coefficient.
+\end{itemize}
+
+\subsection*{Phase 3: Experiment Logging}
+Build the metadata logging pipeline to fulfill the Reproducibility Contract, ensuring that Git hashes, configurations, seeds, and library versions are snapshotted alongside the final Interaction Matrix outputs.
+
+\end{document}

@@ -53,25 +53,30 @@ Constraint-Interaction-SymREG/
 ├── docs/                  # Documentation
 │   ├── API.md             # Public API reference
 │   ├── ARCHITECTURE.md    # This file
-│   └── DESIGN_CONTEXT.md  # Formal mathematical specification and invariants
+│   ├── DESIGN_CONTEXT.md  # Formal mathematical specification and invariants
+│   └── LOGBOOK.md         # Daily project logbook
+├── results/               # Auto-created; benchmark and run outputs (JSON)
 ├── src/                   # Core Python modules
-│   ├── expr_generator.py  # Generation subsystem
+│   ├── expr_generator.py  # Generation subsystem ✓
+│   ├── metric.py          # Monte Carlo estimator ✓
 │   ├── constraints.py     # Constraint evaluation logic (Planned)
-│   ├── metric.py          # Monte Carlo estimator (Planned)
 │   └── experiments.py     # PySR integration (Planned)
 └── tests/                 # Unit tests (mirrors src/ structure)
+    ├── test_expr_generator.py  ✓ (16 tests)
+    └── test_metric.py          ✓ (15 tests + 2 doctests)
 ```
 
 ## Data Flow: Monte Carlo Density Estimation
 
 The primary data flow for calculating the interaction metric $M(i,j)$ follows these steps:
 
-1. **Initialization**: `GrammarGenerator` loads constraints and seeds from `config.yaml`.
-2. **Stratified Sampling**: `generator.generate_stratified()` produces $N$ valid SymPy expressions distributed evenly across specific target depths.
-3. **Validation Pass**: The generator internally tests each expression numerically. If an expression causes a math domain error (e.g., division by zero, complex infinity), it is rejected, and a new one is drawn.
-4. **Constraint Checking**: The `metric.py` module passes each valid expression through constraint functions $C_i(E)$ and $C_j(E)$.
-5. **Density Calculation**: The total number of expressions satisfying the constraints is divided by $N$ to estimate $\rho(C_i)$, $\rho(C_j)$, and the joint probability $\rho(C_i \wedge C_j)$.
-6. **Interaction Matrix**: The final coefficient $M(i,j)$ is computed and logged.
+1. **Initialization**: `GrammarGenerator` loads grammar parameters and seeds from `config.yaml`.
+2. **Sampling**: `DensityEstimator.estimate()` calls `generator.reset_stats()`, then draws exactly `N` valid SymPy expressions via `generate_sympy()`, retrying silently on any `None` return. Transparency into draw attempts is via `generator.stats['generated']`.
+3. **Validation Pass**: Performed inside the generator on each draw — expressions that fail numeric domain probing (`_validate_domain`) are rejected and replaced. Counted in `stats['domain_rejected']`.
+4. **Constraint Checking**: A single pass over the collected expression list evaluates every `C_i(expr)` and every pair `(C_i, C_j)` in O(N·k²) total comparisons (DESIGN_CONTEXT §8).
+5. **Density Calculation**: `rho_i = n_i / N` and `rho_ij = n_ij / N` are returned in a `RhoResult` dataclass.
+6. **Interaction Matrix**: `InteractionMatrix.compute()` fills the upper triangle from `rho_ij`, then **explicitly mirrors** to the lower triangle to guarantee M[i][j] == M[j][i]. Zero-density pairs are set to `NaN`, not a crash (DESIGN_CONTEXT §6.3).
+7. **Confidence Intervals**: `BootstrapCI.compute()` resamples the expression list B=1000 times using the percentile method. The `grammar_config` dict can be passed for §9 reproducibility snapshotting.
 
 ## Key Design Decisions
 
@@ -90,5 +95,6 @@ The primary data flow for calculating the interaction metric $M(i,j)$ follows th
 ## Extension Points
 
 - **Adding New Operators**: Modify the `grammar` section of `config.yaml`. The generator automatically adapts.
-- **Adding New Constraints**: Implement a pure function `C(expr) -> bool` in `constraints.py`.
+- **Adding New Constraints**: Implement a pure function `C(expr) -> bool` in `constraints.py`. No changes to `metric.py` needed — `DensityEstimator.estimate()` accepts any list of callables.
 - **Modifying the Grammar Process**: To change how expressions are structurally built, inherit from `GrammarGenerator` and override the `_generate_recursive` and `_generate_exact_depth` methods.
+- **Custom Bootstrap**: Subclass `BootstrapCI` and override `compute()`. Pass `grammar_config=generator.config` to embed grammar metadata in reproducibility logs per DESIGN_CONTEXT §9.
