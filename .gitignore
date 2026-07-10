@@ -19,6 +19,7 @@ venv/
 # IDE
 .vscode/
 .idea/
+pyrightconfig.json
 
 # OS
 .DS_Store
