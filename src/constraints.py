@@ -16,10 +16,10 @@ def _nested_trig_depth(expr) -> int:
 
 
 _OP_CLASS_MAP = {
-    "+":   sympy.Add,
-    "-":   None,        # no SymPy Sub class; handled by Add + Mul
-    "*":   sympy.Mul,
-    "**":  sympy.Pow,
+    "+": sympy.Add,
+    "-": None,  # no SymPy Sub class; handled by Add + Mul
+    "*": sympy.Mul,
+    "**": sympy.Pow,
     "sin": sympy.sin,
     "cos": sympy.cos,
 }
@@ -38,8 +38,10 @@ def _allowed_op_classes(whitelist):
 
 
 def make_c1_structural(config) -> Callable:
-    max_nested_trig = config['constraints']['structural']['max_nested_trig']
-    max_consecutive_binary = config['constraints']['structural']['max_consecutive_binary']
+    max_nested_trig = config["constraints"]["structural"]["max_nested_trig"]
+    max_consecutive_binary = config["constraints"]["structural"][
+        "max_consecutive_binary"
+    ]
 
     def c1_structural(expr: sympy.Expr) -> bool:
         if _nested_trig_depth(expr) > max_nested_trig:
@@ -52,12 +54,14 @@ def make_c1_structural(config) -> Callable:
         return True
 
     c1_structural.__name__ = "c1_structural"
-    c1_structural.__doc__ = "C1: Structural constraint checking nested trig and consecutive binary ops."
+    c1_structural.__doc__ = (
+        "C1: Structural constraint checking nested trig and consecutive binary ops."
+    )
     return c1_structural
 
 
 def make_c2_depth(config) -> Callable:
-    limit = config['constraints']['depth']['limit']
+    limit = config["constraints"]["depth"]["limit"]
 
     def c2_depth(expr: sympy.Expr) -> bool:
         return _sympy_depth(expr) <= limit
@@ -68,11 +72,22 @@ def make_c2_depth(config) -> Callable:
 
 
 def make_c3_operator(config) -> Callable:
-    allowed = _allowed_op_classes(config['constraints']['operator_whitelist']['allowed'])
+    allowed = _allowed_op_classes(
+        config["constraints"]["operator_whitelist"]["allowed"]
+    )
 
     def c3_operator(expr: sympy.Expr) -> bool:
         for node in sympy.preorder_traversal(expr):
-            if isinstance(node, (sympy.Symbol, sympy.Number, sympy.Integer, sympy.Float, sympy.Rational)):
+            if isinstance(
+                node,
+                (
+                    sympy.Symbol,
+                    sympy.Number,
+                    sympy.Integer,
+                    sympy.Float,
+                    sympy.Rational,
+                ),
+            ):
                 continue
             if type(node) not in allowed:
                 return False
@@ -84,10 +99,10 @@ def make_c3_operator(config) -> Callable:
 
 
 def make_c4_positivity(config) -> Callable:
-    cfg = config['constraints']['positivity']
-    n_pts   = cfg['n_test_points']
-    lo, hi  = cfg['domain']
-    seed    = cfg['rng_seed']           # reads from config, NOT hardcoded
+    cfg = config["constraints"]["positivity"]
+    n_pts = cfg["n_test_points"]
+    lo, hi = cfg["domain"]
+    seed = cfg["rng_seed"]  # reads from config, NOT hardcoded
 
     def c4_positivity(expr: sympy.Expr) -> bool:
         symbols = sorted(expr.free_symbols, key=str)
@@ -96,8 +111,9 @@ def make_c4_positivity(config) -> Callable:
         if not symbols:
             try:
                 val = complex(expr)
-                return bool(np.isfinite(val.real) and val.imag == 0.0
-                            and val.real >= 0.0)
+                return bool(
+                    np.isfinite(val.real) and val.imag == 0.0 and val.real >= 0.0
+                )
             except Exception:
                 return False
 
@@ -105,12 +121,15 @@ def make_c4_positivity(config) -> Callable:
 
         # Path 1: lambdify (vectorised, fast)
         try:
-            f = sympy.lambdify(symbols, expr, modules='numpy')
-            vals = np.asarray(f(*[pts[:, i] for i in range(len(symbols))]),
-                              dtype=complex)
-            return bool(np.all(np.isfinite(vals.real)) and
-                        np.all(vals.imag == 0.0) and
-                        np.all(vals.real >= 0.0))
+            f = sympy.lambdify(symbols, expr, modules="numpy")
+            vals = np.asarray(
+                f(*[pts[:, i] for i in range(len(symbols))]), dtype=complex
+            )
+            return bool(
+                np.all(np.isfinite(vals.real))
+                and np.all(vals.imag == 0.0)
+                and np.all(vals.real >= 0.0)
+            )
         except Exception:
             pass  # fall through
 
@@ -119,8 +138,7 @@ def make_c4_positivity(config) -> Callable:
             subs = {s: sympy.Float(pts[i, j]) for j, s in enumerate(symbols)}
             try:
                 val = complex(expr.subs(subs))
-                if not (np.isfinite(val.real) and val.imag == 0.0
-                        and val.real >= 0.0):
+                if not (np.isfinite(val.real) and val.imag == 0.0 and val.real >= 0.0):
                     return False
             except Exception:
                 return False
@@ -140,6 +158,6 @@ def build_constraints(config, include_c5=False) -> List[Callable]:
         make_c1_structural(config),
         make_c2_depth(config),
         make_c3_operator(config),
-        make_c4_positivity(config)
+        make_c4_positivity(config),
     ]
     return constraints

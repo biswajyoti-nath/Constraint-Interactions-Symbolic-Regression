@@ -1,46 +1,35 @@
-import pytest
 import sympy
 import numpy as np
 from src.constraints import (
     _sympy_depth,
-    _nested_trig_depth,
     make_c1_structural,
     make_c2_depth,
     make_c3_operator,
     make_c4_positivity,
-    build_constraints
+    build_constraints,
 )
 from src.expr_generator import GrammarGenerator
 
+
 def get_test_config():
     return {
-        'constraints': {
-            'structural': {
-                'max_nested_trig': 1,
-                'max_consecutive_binary': 3
-            },
-            'depth': {
-                'limit': 6
-            },
-            'operator_whitelist': {
-                'allowed': ["+", "-", "*"]
-            },
-            'positivity': {
-                'n_test_points': 200,
-                'domain': [-10, 10],
-                'rng_seed': 0
-            }
+        "constraints": {
+            "structural": {"max_nested_trig": 1, "max_consecutive_binary": 3},
+            "depth": {"limit": 6},
+            "operator_whitelist": {"allowed": ["+", "-", "*"]},
+            "positivity": {"n_test_points": 200, "domain": [-10, 10], "rng_seed": 0},
         }
     }
+
 
 class TestC1Structural:
     def setup_method(self):
         self.c1 = make_c1_structural(get_test_config())
-        self.x = sympy.Symbol('x')
-        self.a = sympy.Symbol('a')
-        self.b = sympy.Symbol('b')
-        self.c = sympy.Symbol('c')
-        self.d = sympy.Symbol('d')
+        self.x = sympy.Symbol("x")
+        self.a = sympy.Symbol("a")
+        self.b = sympy.Symbol("b")
+        self.c = sympy.Symbol("c")
+        self.d = sympy.Symbol("d")
 
     def test_single_trig_accepted(self):
         expr = sympy.sin(self.x)
@@ -70,8 +59,8 @@ class TestC1Structural:
 class TestC2Depth:
     def setup_method(self):
         self.c2 = make_c2_depth(get_test_config())
-        self.x = sympy.Symbol('x')
-        self.y = sympy.Symbol('y')
+        self.x = sympy.Symbol("x")
+        self.y = sympy.Symbol("y")
 
     def test_leaf_accepted(self):
         assert self.c2(self.x) is True
@@ -106,22 +95,22 @@ class TestC2Depth:
         gaps = []
         for _ in range(200):
             expr_str = gen.generate(max_depth=4)
-            
+
             gen_depth = 0
             current_depth = 0
             for char in expr_str:
-                if char == '(':
+                if char == "(":
                     current_depth += 1
                     gen_depth = max(gen_depth, current_depth)
-                elif char == ')':
+                elif char == ")":
                     current_depth -= 1
-                    
+
             expr = sympy.sympify(expr_str, evaluate=False)
             s_depth = _sympy_depth(expr)
             gaps.append(s_depth - gen_depth)
-        
+
         gaps = np.array(gaps)
-        print(f"\nDepth Divergence (SymPy - Generator):")
+        print("\nDepth Divergence (SymPy - Generator):")
         print(f"Mean: {gaps.mean():.2f}")
         print(f"Max: {gaps.max()}")
         print(f"Min: {gaps.min()}")
@@ -130,9 +119,9 @@ class TestC2Depth:
 class TestC3OperatorWhitelist:
     def setup_method(self):
         self.c3 = make_c3_operator(get_test_config())
-        self.x = sympy.Symbol('x')
-        self.y = sympy.Symbol('y')
-        self.z = sympy.Symbol('z')
+        self.x = sympy.Symbol("x")
+        self.y = sympy.Symbol("y")
+        self.z = sympy.Symbol("z")
 
     def test_add_accepted(self):
         assert self.c3(self.x + self.y) is True
@@ -161,13 +150,13 @@ class TestC3OperatorWhitelist:
 class TestC4Positivity:
     def setup_method(self):
         self.c4 = make_c4_positivity(get_test_config())
-        self.x = sympy.Symbol('x')
+        self.x = sympy.Symbol("x")
 
     def test_always_nonneg_accepted(self):
         assert self.c4(self.x**2 + 1) is True
 
     def test_always_neg_rejected(self):
-        assert self.c4(-self.x**2 - 1) is False
+        assert self.c4(-(self.x**2) - 1) is False
 
     def test_zero_expression(self):
         assert self.c4(sympy.sympify("0")) is True
@@ -187,22 +176,17 @@ class TestC4Positivity:
     def test_lambdify_subs_agreement(self):
         # Expression that produces complex values for x < 5
         expr = sympy.sqrt(self.x - 5)
-        
+
         # Test with lambdify (Path 1)
         res1 = self.c4(expr)
-        
+
         # Force Path 2 by monkeypatching lambdify to raise an exception
         # or by passing an expression lambdify can't handle. We'll use monkeypatch here via a hack or
-        # create a custom c4 instance that doesn't use lambdify.
-        cfg = get_test_config()
-        c4_fallback = make_c4_positivity(cfg)
-        
-        # We can test path 2 by passing an expression lambdify fails on
         # For simplicity, we just assert res1 is False because of complex values
         assert res1 is False
-        
+
         # A better test for path agreement on valid positive input:
-        expr2 = sympy.sin(self.x)**2
+        expr2 = sympy.sin(self.x) ** 2
         assert self.c4(expr2) is True
 
 
@@ -214,14 +198,15 @@ class TestBuildConstraints:
 
     def test_all_have_names(self):
         constraints = build_constraints(get_test_config())
-        assert all(hasattr(c, '__name__') for c in constraints)
+        assert all(hasattr(c, "__name__") for c in constraints)
 
     def test_c3_rho_well_below_one(self):
         # Integration test checking rho of c3
         from src.metric import DensityEstimator
+
         gen = GrammarGenerator("config.yaml")
         c3 = make_c3_operator(get_test_config())
-        
+
         # Estimate rho for c3 alone
         result = DensityEstimator(gen, max_depth=4).estimate([c3], N=500)
         assert result.rho_i[0] < 0.9  # Should be around 0.3-0.6
