@@ -58,3 +58,16 @@
 - **Testing**: 33 tests pass (16 generator + 15 metric + 2 doctests). Includes `sympify(evaluate=False)` regression test.
 - **Commits**: `499a1a3`, `ad55e4e`.
 
+---
+
+### Entry 06: Constraints Implementation (C1–C4)
+**Date:** 10/07/2026
+
+- **`constraints.py` implemented**: Built the core constraint factories `make_c1_structural`, `make_c2_depth`, `make_c3_operator`, `make_c4_positivity`, and the `build_constraints` aggregator.
+  - C1 (Structural): Checks maximum nested trig depth and consecutive binary ops. Handled SymPy flattening by checking `len(args)`.
+  - C2 (Depth): Uses SymPy `.args`-walk depth. Documented the divergence (bounded gap) for negative constants and subtraction vs. generator depth.
+  - C3 (Operator Whitelist): Pure AST node type check. Avoids `x**2` / `x*x` edge cases thanks to `evaluate=False`.
+  - C4 (Positivity): Validates f(x,y) >= 0. Uses a fast, vectorized `lambdify` path with a robust `.subs()` fallback.
+- **Decisions Made & Documented**: Kept C4 name as `positivity` (implements >=0), C2 depth uses SymPy args-walk, and RNG seed for C4 is pulled from `config.yaml`.
+- **Testing**: Added rigorous testing for boundary conditions, depth divergence measurement, and fallback pathways. The test suite now totals 60 passing tests.
+- **Documentation**: Updated `DESIGN_CONTEXT.md` (§6.2 and §7 gotchas) and `API.md` (Constraints module).

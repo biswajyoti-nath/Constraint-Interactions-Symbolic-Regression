@@ -13,39 +13,47 @@
 \begin{document}
 \maketitle
 
-\section*{Part 1: Summary of Today's Work (Monte Carlo Estimator)}
-Today's focus was on implementing the mathematical core of the framework: the Monte Carlo density estimator and the interaction matrix module (\texttt{src/metric.py}).
+\section*{Part 1: Summary of Today's Work (Constraints C1--C4)}
+
+Today's focus was implementing the four core constraint predicates in \texttt{src/constraints.py}, completing the \texttt{expr\_generator} $\rightarrow$ \texttt{metric} $\rightarrow$ \texttt{constraints} pipeline.
 
 \begin{itemize}
-    \item \textbf{Density Estimator:} Implemented Algorithm 1 from the Research Plan. The \texttt{DensityEstimator} correctly evaluates $\rho(C_i)$ and $\rho(C_i \wedge C_j)$ in a single O(N$\cdot$k$^2$) pass over $N$ valid stratified expressions.
-    \item \textbf{Matrix Symmetry \& Edge Cases:} Built the \texttt{InteractionMatrix} to explicitly mirror the upper triangle to the lower triangle, strictly enforcing the $M[i][j] = M[j][i]$ invariant. Handled zero-density components gracefully by propagating \texttt{NaN} rather than causing divide-by-zero crashes.
-    \item \textbf{Statistical Rigor:} Implemented \texttt{BootstrapCI} using the percentile method ($B=1000$ resamples) to attach 95\% confidence intervals to the interaction coefficients.
-    \item \textbf{Calibration-First Benchmarking:} Created a \texttt{run\_benchmark()} utility that logs hardware-specific generation metrics (wall-clock time, rejection rates) to \texttt{results/benchmark\_1k.json}. This establishes an empirical baseline before scaling up to $N=100,000$.
-    \item \textbf{Regression Testing:} Added a 15-test suite for \texttt{metric.py} (bringing the project total to 33 passing tests). Critically, included a \texttt{sympify(evaluate=False)} structural regression test to guarantee that abstract syntax trees (like \texttt{x + x}) do not collapse into simplified algebraic forms (\texttt{2*x}) before constraint evaluation.
+    \item \textbf{C1 -- Structural Constraint:} Implemented \texttt{make\_c1\_structural} enforcing two sub-rules: (a) maximum nested trig depth of 1 (\texttt{sin(cos(x))} rejected; parallel siblings accepted); (b) maximum flattened \texttt{Add}/\texttt{Mul} arity of 3 (2 consecutive binary ops at limit). Handled SymPy's automatic flattening of repeated additions by checking \texttt{len(node.args)} rather than tree depth.
+
+    \item \textbf{C2 -- Depth Constraint:} Implemented \texttt{make\_c2\_depth} using a recursive \texttt{.args}-walk depth. Formally documented the divergence between SymPy depth and generator string depth (e.g., \texttt{-x} $\rightarrow$ \texttt{Mul(-1, x)}, depth 1). The bias is bounded ($\leq +2$ per affected node) and measured empirically by \texttt{test\_depth\_divergence\_measured} (mean gap: 0.42, max: 3). Rejected the opt-in passthrough alternative to preserve the \texttt{Expr $\rightarrow$ bool} purity contract.
+
+    \item \textbf{C3 -- Operator Whitelist:} Implemented \texttt{make\_c3\_operator} via \texttt{preorder\_traversal}, skipping leaf types (\texttt{Symbol}, \texttt{Number}, etc.) and rejecting any non-leaf node whose type is outside the frozenset of permitted classes. The single \texttt{\_OP\_CLASS\_MAP} dict (Bug \#4 fix) correctly expands \texttt{"-"} to both \texttt{Add} and \texttt{Mul}. Empirically confirmed $\rho(C_3) \approx 0.23$, which is in the expected 0.3--0.6 band (a value near 1.0 would indicate a bug).
+
+    \item \textbf{C4 -- Positivity (Non-Negativity):} Implemented \texttt{make\_c4\_positivity} with a vectorised \texttt{lambdify} fast path and a pointwise \texttt{.subs()} fallback. Predicate is $f(x,y) \geq 0$ (not $> 0$) per Research Plan \S5; boundary case $f = 0$ returns \texttt{True}. RNG seed is read exclusively from \texttt{config['constraints']['positivity']['rng\_seed']} (Bug \#2 fix).
+
+    \item \textbf{Testing:} 29 new tests added across \texttt{TestC1Structural}, \texttt{TestC2Depth}, \texttt{TestC3OperatorWhitelist}, \texttt{TestC4Positivity}, and \texttt{TestBuildConstraints}. Includes mandatory boundary-locking tests and the empirical divergence measurement for Handbook \S12. Full suite: \textbf{60 tests, all passing}.
+
+    \item \textbf{Integration Smoke Test:} \texttt{DensityEstimator.estimate(build\_constraints(cfg), N=1000)} returned $\rho = [0.404, 0.987, 0.227, 0.231]$ -- all within the expected ranges from the plan.
+
+    \item \textbf{Documentation:} Updated \texttt{DESIGN\_CONTEXT.md} (\S6.2 marked Implemented; four new Known Gotchas), \texttt{API.md} (\texttt{src.constraints} module section), \texttt{config.yaml} (\texttt{rng\_seed: 0} + clarifying comment), and \texttt{LOGBOOK.md} (Entry 06).
 \end{itemize}
 
 \section*{Part 2: Strict Plan for Tomorrow}
-With the \texttt{expr\_generator} and \texttt{metric.py} modules complete and rigorously tested, tomorrow's efforts will focus on implementing the \textbf{Constraint Evaluators} and executing the first \textbf{Full Interaction Analysis}.
 
-\subsection*{Phase 1: Implement Constraints (\texttt{src/constraints.py})}
-We will build the pure, deterministic Python functions that categorize the expressions.
-\begin{enumerate}[label=C\arabic*.]
-    \item \textbf{Structural Constraints}: Ensuring specific variable presence or polynomial shapes.
-    \item \textbf{Depth Constraints}: Filtering ASTs that exceed strict complexity limits.
-    \item \textbf{Operator Whitelists}: Validating that only subset operators (e.g., \{+, *, sin\}) exist in the tree.
-    \item \textbf{Positivity Constraints}: Ensuring the domain of the expression is strictly non-negative.
-    \item \textbf{Dimensional Constraints}: Enforcing specific physical dimensional consistency on the AST leaves.
-\end{enumerate}
+With constraints C1--C4 complete, tomorrow's work will close the pipeline by implementing \texttt{src/experiments.py} and running the full metric computation.
 
-\subsection*{Phase 2: The 100k Monte Carlo Run}
-Integrate the fully specified constraints with the Monte Carlo pipeline.
+\subsection*{Phase 1: Experiment Runner (\texttt{src/experiments.py})}
+
+Build the experiment orchestration layer following \texttt{DESIGN\_CONTEXT.md} \S9.
+
 \begin{itemize}
-    \item Execute the density estimator at scale ($N=100,000$).
-    \item Generate the first complete Interaction Matrix heatmap $M(i,j)$.
-    \item Package all generator stats, metadata, and RNG seeds into the Reproducibility Contract JSON logging payload.
+    \item \textbf{Reproducibility Logging:} Snapshot Git hash, config SHA-256, Python version, library versions, and timestamp to \texttt{results/<run\_id>/metadata.json} before each run starts.
+    \item \textbf{Multi-seed Runs:} Iterate over \texttt{config.experiments.seeds} and \texttt{config.monte\_carlo.N}, calling \texttt{DensityEstimator.estimate(build\_constraints(cfg), N)} for each seed.
+    \item \textbf{Matrix + CI:} Compute \texttt{InteractionMatrix} and \texttt{BootstrapCI} ($B=1000$) per run; store the $M(i,j)$ array and 95\% CI bounds to JSON.
+    \item \textbf{Append-Only Results:} Each run writes to a new \texttt{run\_id} directory; no overwriting of prior results (DESIGN\_CONTEXT \S6.4).
 \end{itemize}
 
-\subsection*{Phase 3: PySR Integration (\texttt{src/experiments.py})}
-Begin scaffolding the interface that binds these Python-defined constraints into PySR's Julia-backed evolutionary search engine.
+\subsection*{Phase 2: Full Pipeline Run}
+
+Execute the complete pipeline with $N = 100{,}000$ and the five seeds from config, producing the definitive $\rho_i$ and $M(i,j)$ tables for the Research Plan \S7 results section.
+
+\subsection*{Phase 3 (If Time Permits): C5 -- Dimensional Consistency}
+
+Implement \texttt{make\_c5\_dimensional} using a manual dimension-algebra tree walk with \texttt{fractions.Fraction} exponent tracking (no \texttt{sympy.physics.units}) and enable it via \texttt{build\_constraints(cfg, include\_c5=True)}.
 
 \end{document}

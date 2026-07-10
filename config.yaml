@@ -31,8 +31,12 @@ constraints:
   operator_whitelist:
     allowed: ["+", "-", "*"]    # no trig
   positivity:
+    # Note: implements f(x,y) >= 0 (non-negativity) per Research Plan §5,
+    # not strict positivity (> 0). Key name kept as "positivity" for
+    # consistency with paper/handbook terminology. See DESIGN_CONTEXT §7.
     n_test_points: 200
     domain: [-10, 10]
+    rng_seed: 0
   dimensional:
     enabled: false              # optional, skip if time-constrained
     variables:

@@ -84,7 +84,7 @@ Every returned expression must:
 - Be reproducible given an identical random seed
 - Never be mutated after generation
 
-### 6.2 Constraints (`constraints.py`) — TODO
+### 6.2 Constraints (`constraints.py`) — Implemented
 
 Each constraint C must:
 - Be a pure function: `sympy.Expr → bool`
@@ -93,6 +93,9 @@ Each constraint C must:
 - Handle edge cases (constants, single-variable, deeply nested) 
   without raising — return False if invalid
 - Be independent of other constraints (no shared mutable state)
+
+> C2 is a documented exception to the §7 note on depth semantics. It uses SymPy `.args`-walk depth. This is the only depth computable from a pure `Expr → bool` function. The bias is bounded and measured empirically — see `test_depth_divergence_measured`.
+
 
 ### 6.3 Metric (`metric.py`) — Implemented
 
@@ -131,9 +134,13 @@ Each constraint C must:
   search explores expressions differently from our uniform-random generator.
   M(i,j) predicts *structural* interactions in the grammar space, not exact
   search dynamics. Results should be interpreted as approximations.
-- **SymPy tree depth ≠ generator depth.** `sympify("-7", evaluate=False)` returns
-  `Mul(-1, 7)` (depth 1 in SymPy), not `Integer(-7)` (depth 0). Always measure
+- **SymPy tree depth ≠ generator depth.** `sympify("-x", evaluate=False)` returns
+  `Mul(-1, x)` (depth 1 in SymPy), not `Integer(-7)` (depth 0). Always measure
   depth on the generated string, not on SymPy's internal tree.
+- **C1b SymPy flattening:** `(a+b)+c` → `Add(a,b,c)` even under `evaluate=False` for repeated application. C1b checks `len(args)`, not tree depth.
+- **C2 SymPy vs. generator depth:** SymPy depth ≥ generator depth for expressions with negative constants or subtraction (gap ≤ +2 per affected node). Measured by `test_depth_divergence_measured`.
+- **C3 `x*x` vs. `x**2`:** Under `evaluate=False`, `x*x` stays `Mul(x,x)` (accepted). Only `x**2` literal produces `Pow` (rejected). Generator never produces `Pow` since it uses `evaluate=False`.
+- **C4 non-negativity name mismatch:** Predicate is `>= 0` (Research Plan §5). Config key `positivity` implies `> 0`. Boundary case `f=0` → True. Comment in `config.yaml` clarifies.
 
 ## 8. Computational Complexity
 

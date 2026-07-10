@@ -151,4 +151,35 @@ Calibration utility. Runs the estimator with an always-true constraint and logs 
 
 ---
 
-> **Note on Planned Modules**: `src/constraints.py` and `src/experiments.py` are not yet implemented. Their public APIs will be documented here as they are built.
+## Module: `src.constraints`
+
+Implements the pure constraint functions evaluated on generated expressions. 
+
+### Function: `build_constraints`
+
+```python
+from src.constraints import build_constraints
+constraints = build_constraints(config, include_c5=False)
+```
+
+Constructs and returns a list of constraint callables (`C1`, `C2`, `C3`, `C4`) based on the provided configuration.
+
+- **Args**:
+  - `config` (`dict`): The loaded YAML configuration dictionary.
+  - `include_c5` (`bool`): Optional. If True, includes the dimensional consistency constraint (if implemented).
+- **Returns**: `list[Callable[[sympy.Expr], bool]]`
+
+### Constraint Factories
+
+Each constraint is instantiated by a factory function that reads the relevant parameters from the config dictionary and returns a pure closure. The returned callables all have the signature `(sympy.Expr) -> bool`.
+
+- `make_c1_structural(config)`: Checks maximum nested trig depth and consecutive binary operations (`structural` config block).
+- `make_c2_depth(config)`: Checks the SymPy `.args`-walk depth limit (`depth` config block).
+- `make_c3_operator(config)`: Checks that all operators belong to the whitelist (`operator_whitelist` config block).
+- `make_c4_positivity(config)`: Evaluates f(x,y) >= 0 at `n_test_points` random domain points (`positivity` config block).
+
+> **Contract Reminder**: Every constraint is a pure, deterministic function `sympy.Expr → bool`. Constraints do not mutate the input expression.
+
+---
+
+> **Note on Planned Modules**: `src/experiments.py` is not yet implemented. Its public API will be documented here as it is built.
