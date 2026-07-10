@@ -1,9 +1,13 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[margin=1in]{geometry}
+\usepackage{microtype}
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{enumitem}
+
+% Relax line-breaking to eliminate overfull hboxes from long \texttt{} tokens
+\sloppy
 
 \title{\textbf{Daily Progress \& Next Steps Plan}\\
 \large Constraint-Interaction Metric for Symbolic Regression}
@@ -15,45 +19,78 @@
 
 \section*{Part 1: Summary of Today's Work (Constraints C1--C4)}
 
-Today's focus was implementing the four core constraint predicates in \texttt{src/constraints.py}, completing the \texttt{expr\_generator} $\rightarrow$ \texttt{metric} $\rightarrow$ \texttt{constraints} pipeline.
+Today's focus was implementing the four core constraint predicates in \texttt{src/constraints.py},
+completing the \texttt{expr\_generator} $\rightarrow$ \texttt{metric} $\rightarrow$ \texttt{constraints} pipeline.
 
 \begin{itemize}
-    \item \textbf{C1 -- Structural Constraint:} Implemented \texttt{make\_c1\_structural} enforcing two sub-rules: (a) maximum nested trig depth of 1 (\texttt{sin(cos(x))} rejected; parallel siblings accepted); (b) maximum flattened \texttt{Add}/\texttt{Mul} arity of 3 (2 consecutive binary ops at limit). Handled SymPy's automatic flattening of repeated additions by checking \texttt{len(node.args)} rather than tree depth.
+    \item \textbf{C1 -- Structural Constraint:} Implemented \texttt{make\_c1\_structural} enforcing
+    two sub-rules: (a) maximum nested trig depth of 1 (\texttt{sin(cos(x))} rejected; parallel
+    siblings accepted); (b) maximum flattened \texttt{Add}/\texttt{Mul} arity of 3 (2 consecutive
+    binary ops at limit). Handled SymPy's automatic flattening by checking \texttt{len(node.args)}.
 
-    \item \textbf{C2 -- Depth Constraint:} Implemented \texttt{make\_c2\_depth} using a recursive \texttt{.args}-walk depth. Formally documented the divergence between SymPy depth and generator string depth (e.g., \texttt{-x} $\rightarrow$ \texttt{Mul(-1, x)}, depth 1). The bias is bounded ($\leq +2$ per affected node) and measured empirically by \texttt{test\_depth\_divergence\_measured} (mean gap: 0.42, max: 3). Rejected the opt-in passthrough alternative to preserve the \texttt{Expr $\rightarrow$ bool} purity contract.
+    \item \textbf{C2 -- Depth Constraint:} Implemented \texttt{make\_c2\_depth} using a recursive
+    \texttt{.args}-walk depth. Formally documented the divergence between SymPy depth and generator
+    string depth (e.g., \texttt{-x} $\rightarrow$ \texttt{Mul(-1,\,x)}, depth 1). The bias is
+    bounded ($\leq +2$ per node) and measured empirically by \texttt{test\_depth\_divergence\_measured}
+    (mean gap: 0.42, max: 3). Rejected the passthrough alternative to preserve the
+    \texttt{Expr $\rightarrow$ bool} purity contract.
 
-    \item \textbf{C3 -- Operator Whitelist:} Implemented \texttt{make\_c3\_operator} via \texttt{preorder\_traversal}, skipping leaf types (\texttt{Symbol}, \texttt{Number}, etc.) and rejecting any non-leaf node whose type is outside the frozenset of permitted classes. The single \texttt{\_OP\_CLASS\_MAP} dict (Bug \#4 fix) correctly expands \texttt{"-"} to both \texttt{Add} and \texttt{Mul}. Empirically confirmed $\rho(C_3) \approx 0.23$, which is in the expected 0.3--0.6 band (a value near 1.0 would indicate a bug).
+    \item \textbf{C3 -- Operator Whitelist:} Implemented \texttt{make\_c3\_operator} via
+    \texttt{preorder\_traversal}, skipping leaf types (\texttt{Symbol}, \texttt{Number}, etc.) and
+    rejecting non-leaf nodes outside the permitted frozenset. The single \texttt{\_OP\_CLASS\_MAP}
+    dict (Bug~\#4 fix) expands \texttt{"-"} to both \texttt{Add} and \texttt{Mul}.
+    Empirically confirmed $\rho(C_3) \approx 0.23$, in the expected 0.3--0.6 band.
 
-    \item \textbf{C4 -- Positivity (Non-Negativity):} Implemented \texttt{make\_c4\_positivity} with a vectorised \texttt{lambdify} fast path and a pointwise \texttt{.subs()} fallback. Predicate is $f(x,y) \geq 0$ (not $> 0$) per Research Plan \S5; boundary case $f = 0$ returns \texttt{True}. RNG seed is read exclusively from \texttt{config['constraints']['positivity']['rng\_seed']} (Bug \#2 fix).
+    \item \textbf{C4 -- Positivity (Non-Negativity):} Implemented \texttt{make\_c4\_positivity}
+    with a vectorised \texttt{lambdify} fast path and a \texttt{.subs()} fallback.
+    Predicate: $f(x,y) \geq 0$ (not $> 0$) per Research Plan~\S5; boundary $f = 0$ returns
+    \texttt{True}. RNG seed read from config key \texttt{rng\_seed} (Bug~\#2 fix).
 
-    \item \textbf{Testing:} 29 new tests added across \texttt{TestC1Structural}, \texttt{TestC2Depth}, \texttt{TestC3OperatorWhitelist}, \texttt{TestC4Positivity}, and \texttt{TestBuildConstraints}. Includes mandatory boundary-locking tests and the empirical divergence measurement for Handbook \S12. Full suite: \textbf{60 tests, all passing}.
+    \item \textbf{Testing:} 29 new tests added across \texttt{TestC1Structural},
+    \texttt{TestC2Depth}, \texttt{TestC3OperatorWhitelist}, \texttt{TestC4Positivity},
+    and \texttt{TestBuildConstraints}. Includes mandatory boundary-locking tests and the
+    empirical divergence measurement for Handbook~\S12.
+    Full suite: \textbf{60 tests, all passing}.
 
-    \item \textbf{Integration Smoke Test:} \texttt{DensityEstimator.estimate(build\_constraints(cfg), N=1000)} returned $\rho = [0.404, 0.987, 0.227, 0.231]$ -- all within the expected ranges from the plan.
+    \item \textbf{Integration Smoke Test:} Running the full estimator with
+    \texttt{build\_constraints(cfg)} at $N=1000$ returned
+    $\rho = [0.404,\; 0.987,\; 0.227,\; 0.231]$ --- all within the expected ranges.
 
-    \item \textbf{Documentation:} Updated \texttt{DESIGN\_CONTEXT.md} (\S6.2 marked Implemented; four new Known Gotchas), \texttt{API.md} (\texttt{src.constraints} module section), \texttt{config.yaml} (\texttt{rng\_seed: 0} + clarifying comment), and \texttt{LOGBOOK.md} (Entry 06).
+    \item \textbf{Documentation:} Updated \texttt{DESIGN\_CONTEXT.md} (\S6.2 marked Implemented;
+    four new Known Gotchas), \texttt{API.md} (\texttt{src.constraints} section),
+    \texttt{config.yaml} (\texttt{rng\_seed:\,0} + comment), and \texttt{LOGBOOK.md} (Entry~06).
 \end{itemize}
 
 \section*{Part 2: Strict Plan for Tomorrow}
 
-With constraints C1--C4 complete, tomorrow's work will close the pipeline by implementing \texttt{src/experiments.py} and running the full metric computation.
+With constraints C1--C4 complete, tomorrow's work will close the pipeline by implementing
+\texttt{src/experiments.py} and running the full metric computation.
 
 \subsection*{Phase 1: Experiment Runner (\texttt{src/experiments.py})}
 
-Build the experiment orchestration layer following \texttt{DESIGN\_CONTEXT.md} \S9.
+Build the experiment orchestration layer following \texttt{DESIGN\_CONTEXT.md}~\S9.
 
 \begin{itemize}
-    \item \textbf{Reproducibility Logging:} Snapshot Git hash, config SHA-256, Python version, library versions, and timestamp to \texttt{results/<run\_id>/metadata.json} before each run starts.
-    \item \textbf{Multi-seed Runs:} Iterate over \texttt{config.experiments.seeds} and \texttt{config.monte\_carlo.N}, calling \texttt{DensityEstimator.estimate(build\_constraints(cfg), N)} for each seed.
-    \item \textbf{Matrix + CI:} Compute \texttt{InteractionMatrix} and \texttt{BootstrapCI} ($B=1000$) per run; store the $M(i,j)$ array and 95\% CI bounds to JSON.
-    \item \textbf{Append-Only Results:} Each run writes to a new \texttt{run\_id} directory; no overwriting of prior results (DESIGN\_CONTEXT \S6.4).
+    \item \textbf{Reproducibility Logging:} Snapshot Git hash, config SHA-256, Python version,
+    library versions, and timestamp to \texttt{results/<run\_id>/metadata.json} before each run.
+    \item \textbf{Multi-seed Runs:} Iterate over \texttt{config.experiments.seeds} and
+    \texttt{config.monte\_carlo.N}; call \texttt{DensityEstimator.estimate} with
+    \texttt{build\_constraints(cfg)} for each seed.
+    \item \textbf{Matrix + CI:} Compute \texttt{InteractionMatrix} and \texttt{BootstrapCI}
+    ($B=1000$) per run; store $M(i,j)$ and 95\% CI bounds to JSON.
+    \item \textbf{Append-Only Results:} Each run writes to a new \texttt{run\_id} directory;
+    no overwriting of prior results (DESIGN\_CONTEXT~\S6.4).
 \end{itemize}
 
 \subsection*{Phase 2: Full Pipeline Run}
 
-Execute the complete pipeline with $N = 100{,}000$ and the five seeds from config, producing the definitive $\rho_i$ and $M(i,j)$ tables for the Research Plan \S7 results section.
+Execute the complete pipeline with $N = 100{,}000$ and the five seeds from config, producing
+the definitive $\rho_i$ and $M(i,j)$ tables for the Research Plan~\S7 results section.
 
 \subsection*{Phase 3 (If Time Permits): C5 -- Dimensional Consistency}
 
-Implement \texttt{make\_c5\_dimensional} using a manual dimension-algebra tree walk with \texttt{fractions.Fraction} exponent tracking (no \texttt{sympy.physics.units}) and enable it via \texttt{build\_constraints(cfg, include\_c5=True)}.
+Implement \texttt{make\_c5\_dimensional} using a manual dimension-algebra tree walk with
+\texttt{fractions.Fraction} exponent tracking (no \texttt{sympy.physics.units}),
+enabled via \texttt{build\_constraints(cfg, include\_c5=True)}.
 
 \end{document}
