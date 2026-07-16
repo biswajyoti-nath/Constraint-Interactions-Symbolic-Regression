@@ -107,12 +107,14 @@ Each constraint C must:
 - `N_actual` == requested `N` always (✓ while-loop retries None draws; see `RhoResult` docstring).
 - `grammar_config` can be passed to `BootstrapCI.compute()` for §9 reproducibility snapshotting.
 
-### 6.4 Experiments (`experiments.py`) — TODO
+### 6.4 Experiments (`experiments.py`) — Implemented
 
-- Must log all reproducibility metadata (see §9)
-- Must use fixed seeds from config
-- Must not modify config during a run
-- Results must be append-only (no overwriting previous runs)
+- **Reproducibility Contract Compliance**: `run_experiment_matrix()` records all required package versions, git commit hash, and config SHA256 in `results/<run_id>/metadata.json` before starting experiments.
+- **Fixed/Isolated Seeds**: Uses seeds from `config.yaml` to ensure reproducibility. Dataset splits are locked using `seeds[0]` to isolate search randomness from data partition variance.
+- **Constraint Composition**: Map constraints to PySR parameters dynamically: C1 to `nested_constraints` trig nesting limits; C2 to `maxdepth`; C3 by intersecting allowed operators with base operators; C4 via elementwise loss penalty in Julia.
+- **Post-Hoc Verification**: Evaluates all constraints (C1-C4) post-hoc on the final selected best expression, reporting boolean satisfaction states in the CSV results.
+- **Fail-Safe Orchestration**: Fits PySR models inside `try-except` blocks. Failures are captured in the CSV under the `error` column, preventing a single failed run from crashing the entire batch.
+- **Non-destructive Directory Structure**: All results and metadata are written to a unique `results/<run_id>/` directory to prevent overwriting past runs.
 
 ## 7. Known Gotchas
 

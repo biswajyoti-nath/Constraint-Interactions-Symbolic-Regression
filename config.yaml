@@ -52,12 +52,14 @@ pysr:
   unary_operators: ["sin", "cos", "exp", "log"]
 
 datasets:
-  - name: "feynman_1"
+  - name: "feynman_ke"
     description: "Kinetic energy: 0.5 * m * v^2"
-  - name: "feynman_2"
+  - name: "feynman_coulomb"
     description: "Coulomb's law: q1*q2 / (4*pi*eps*r^2)"
   - name: "polynomial"
     description: "Synthetic 3-term polynomial"
+  - name: "srsd_dummy"
+    description: "Dummy variable test"
 
 experiments:
   repeats: 5

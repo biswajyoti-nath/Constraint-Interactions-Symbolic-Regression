@@ -71,3 +71,17 @@
 - **Decisions Made & Documented**: Kept C4 name as `positivity` (implements >=0), C2 depth uses SymPy args-walk, and RNG seed for C4 is pulled from `config.yaml`.
 - **Testing**: Added rigorous testing for boundary conditions, depth divergence measurement, and fallback pathways. The test suite now totals 60 passing tests.
 - **Documentation**: Updated `DESIGN_CONTEXT.md` (§6.2 and §7 gotchas) and `API.md` (Constraints module).
+
+---
+
+### Entry 07: PySR Integration and Experiment Orchestration
+**Date:** 16/07/2026
+
+- **`experiments.py` implemented**: Implemented the four-layer PySR benchmarking module to produce raw search cost data $S(i,j)$.
+  - **Dataset Loaders**: Created deterministic loaders for `feynman_ke`, `feynman_coulomb`, `polynomial`, and `srsd_dummy`.
+  - **PySR Constraint Mapper & Composer**: Mapped active constraints dynamically to PySR config parameters (C1 nested trig limits, C2 maxdepth, C3 operator whitelist intersection, C4 Julia custom loss penalty).
+  - **Scenario Runner**: Configured isolated serial deterministic PySR runs, logging wall-clock search timings, calculating MSE/relative MSE/NED (DP Levenshtein fallback), and running post-hoc compliance checks.
+  - **Orchestrator**: Orchestrates the benchmark runs, writing Git/environment metadata to `metadata.json` and logging results incrementally to a run-specific CSV.
+- **Dependencies**: Added `scikit-learn>=1.3` to `requirements.txt`.
+- **Testing**: Implemented `tests/test_experiments.py` covering shapes, determinism, ground truth recovery, Levenshtein fallback, and constraint merging. Test suite expanded from 60 to 83 passing tests.
+- **Documentation**: Updated `DESIGN_CONTEXT.md` (§6.4 invariants) and logged progress.
