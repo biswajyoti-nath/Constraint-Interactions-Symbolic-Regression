@@ -14,13 +14,21 @@
 \end{center}
 
 \noindent\textbf{Group Members:} Biswajyoti Nath, Subinoy Nath \\
-\textbf{Supervisor Name:} Dr. Mahapara Khureshi \\
+\textbf{Supervisors:} Dr. Mahapara Khureshi, Dr. Debajit Sarma \\
 \textbf{Project Title:} Constraint-Interaction Metric for Symbolic Regression
 
 \vspace{0.5cm}
 
 \section*{Abstract}
 Symbolic Regression (SR) aims to discover interpretable mathematical expressions from data. To constrain the massive combinatorial search space, practitioners apply structural priors (e.g., maximum depth, operator limits). However, the interaction between multiple constraints is poorly understood. This project introduces a theoretical constraint-interaction metric, $M(i,j)$, which quantifies whether two constraints act synergistically, redundantly, or independently on the grammatical search space. Using Monte Carlo density estimation on SymPy abstract syntax trees, we derive $M(i,j)$ and empirically validate it against PySR, a state-of-the-art evolutionary symbolic regressor. The objective is to demonstrate that the theoretical metric $M(i,j)$ accurately predicts the empirical search speedup $S(i,j)$, providing a rigorously grounded framework for optimizing hyperparameter selection in symbolic regression tasks.
+
+\section*{Current Research Objectives}
+The ongoing project focuses on answering several key methodological questions:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Predictive Validity:} Validating whether the grammar-derived metric $M(i,j)$ robustly predicts actual wall-clock speedups $S(i,j)$ across different benchmark datasets (e.g., Feynman physics equations).
+    \item \textbf{Distributional Drift:} Quantifying the divergence between theoretical uniform Monte Carlo grammar sampling and the inherently biased evolutionary search distribution utilized by PySR.
+    \item \textbf{Methodological Integrity:} Establishing rigorous data pipelines that account for Julia JIT-compilation overhead biases and the statistical implications of right-censored PySR runs (timeouts) under heavy constraint loads.
+\end{itemize}
 
 \section*{Components required}
 \begin{itemize}[leftmargin=*]
