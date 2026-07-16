@@ -435,8 +435,9 @@ A null or negative result with correct methodology still satisfies this criterio
 ## 12. Known Gaps & Open Questions
 
 **Known Gaps (M ≠ S Divergences to document in Ch. 13 and Ch. 9):**
-1. **C1b not enforced in PySR**: PySR has no parameter for sibling count limits in flattened nodes. PySR search only restricts C1a (nested trig).
+1. **C1b Out of Scope**: PySR has no parameter for sibling count limits in flattened nodes, meaning PySR search only restricts C1a (nested trig). Therefore, C1b (`max_consecutive_binary`) has been formally **excluded** from the active constraint set via `enforce_c1a_only: true`. M(i,j) measures C1a ∩ {C2, C3, C4}, aligning theoretical measurements with actual PySR enforcement.
 2. **C2 depth conventions**: PySR's `maxdepth` acts on internal binary trees, which differs from SymPy `.args` depth used for the density estimate.
+3. **Sampling vs Search Distribution**: Empirical $\rho$ estimates cannot be computed directly from PySR's full search trajectory because PySR does not expose generation-0 expressions. A 1-iteration Hall-of-Fame proxy provides a directional lower bound (`scripts/distribution_audit.py`). The audit confirms that the divergence between Monte Carlo $\rho$ and PySR HoF empirical $\rho$ is strictly less than an order of magnitude (e.g., 2.94x max for C1a). This indicates M(i,j) retains directional predictive value. This is the primary system limitation to be discussed in Ch. 13.
 
 **Open Questions:**
 1. **C5 Dimensional**: `constraints.dimensional.enabled: false`. Include in interaction matrix or skip entirely? Adds O(k) complexity to experiments.

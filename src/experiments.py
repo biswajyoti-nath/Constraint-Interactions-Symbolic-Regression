@@ -23,6 +23,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from constraints import (
     make_c1_structural,
+    make_c1a_nested_trig,
     make_c2_depth,
     make_c3_operator,
     make_c4_positivity,
@@ -248,7 +249,10 @@ def audit_hall_of_fame(model, config) -> dict:
     This quantifies the gap between the theoretical M(i,j) density
     (computed under uniform grammar sampling) and PySR's actual search.
     """
-    c1_fn = make_c1_structural(config)
+    if config.get("constraints", {}).get("structural", {}).get("enforce_c1a_only", False):
+        c1_fn = make_c1a_nested_trig(config)
+    else:
+        c1_fn = make_c1_structural(config)
     c2_fn = make_c2_depth(config)
 
     hof = model.equations_
@@ -387,8 +391,13 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
 
     # Post-hoc constraint compliance checks
     compliance = {}
+    if config.get("constraints", {}).get("structural", {}).get("enforce_c1a_only", False):
+        c1_fn = make_c1a_nested_trig(config)
+    else:
+        c1_fn = make_c1_structural(config)
+
     constraint_fns = {
-        "C1": make_c1_structural(config),
+        "C1": c1_fn,
         "C2": make_c2_depth(config),
         "C3": make_c3_operator(config),
         "C4": make_c4_positivity(config),

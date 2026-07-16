@@ -2,6 +2,8 @@ import sympy
 import numpy as np
 from src.constraints import (
     _sympy_depth,
+    make_c1a_nested_trig,
+    make_c1b_consecutive_binary,
     make_c1_structural,
     make_c2_depth,
     make_c3_operator,
@@ -25,6 +27,8 @@ def get_test_config():
 class TestC1Structural:
     def setup_method(self):
         self.c1 = make_c1_structural(get_test_config())
+        self.c1a = make_c1a_nested_trig(get_test_config())
+        self.c1b = make_c1b_consecutive_binary(get_test_config())
         self.x = sympy.Symbol("x")
         self.a = sympy.Symbol("a")
         self.b = sympy.Symbol("b")
@@ -33,26 +37,32 @@ class TestC1Structural:
 
     def test_single_trig_accepted(self):
         expr = sympy.sin(self.x)
+        assert self.c1a(expr) is True
         assert self.c1(expr) is True
 
     def test_nested_trig_rejected(self):
         expr = sympy.sin(sympy.cos(self.x))
+        assert self.c1a(expr) is False
         assert self.c1(expr) is False
 
     def test_parallel_trig_accepted(self):
         expr = sympy.sin(self.x) + sympy.cos(self.x)
+        assert self.c1a(expr) is True
         assert self.c1(expr) is True
 
     def test_binary_at_limit(self):
         expr = sympy.Add(self.a, self.b, self.c)
+        assert self.c1b(expr) is True
         assert self.c1(expr) is True
 
     def test_binary_exceeds_limit(self):
         expr = sympy.Add(self.a, self.b, self.c, self.d)
+        assert self.c1b(expr) is False
         assert self.c1(expr) is False
 
     def test_binary_two_ops_accepted(self):
         expr = (self.a + self.b) * self.c
+        assert self.c1b(expr) is True
         assert self.c1(expr) is True
 
 

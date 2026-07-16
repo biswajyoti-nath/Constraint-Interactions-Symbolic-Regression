@@ -37,21 +37,42 @@ def _allowed_op_classes(whitelist):
     return frozenset(classes)
 
 
-def make_c1_structural(config) -> Callable:
+def make_c1a_nested_trig(config) -> Callable:
     max_nested_trig = config["constraints"]["structural"]["max_nested_trig"]
+
+    def c1a_nested_trig(expr: sympy.Expr) -> bool:
+        if _nested_trig_depth(expr) > max_nested_trig:
+            return False
+        return True
+
+    c1a_nested_trig.__name__ = "c1a_nested_trig"
+    c1a_nested_trig.__doc__ = "C1a: Structural constraint checking nested trig."
+    return c1a_nested_trig
+
+
+def make_c1b_consecutive_binary(config) -> Callable:
     max_consecutive_binary = config["constraints"]["structural"][
         "max_consecutive_binary"
     ]
 
-    def c1_structural(expr: sympy.Expr) -> bool:
-        if _nested_trig_depth(expr) > max_nested_trig:
-            return False
-
+    def c1b_consecutive_binary(expr: sympy.Expr) -> bool:
         for node in sympy.preorder_traversal(expr):
             if isinstance(node, (sympy.Add, sympy.Mul)):
                 if len(node.args) > max_consecutive_binary:
                     return False
         return True
+
+    c1b_consecutive_binary.__name__ = "c1b_consecutive_binary"
+    c1b_consecutive_binary.__doc__ = "C1b: Structural constraint checking consecutive binary ops."
+    return c1b_consecutive_binary
+
+
+def make_c1_structural(config) -> Callable:
+    c1a = make_c1a_nested_trig(config)
+    c1b = make_c1b_consecutive_binary(config)
+
+    def c1_structural(expr: sympy.Expr) -> bool:
+        return c1a(expr) and c1b(expr)
 
     c1_structural.__name__ = "c1_structural"
     c1_structural.__doc__ = (
@@ -154,8 +175,13 @@ def make_c4_positivity(config) -> Callable:
 
 
 def build_constraints(config, include_c5=False) -> List[Callable]:
+    if config.get("constraints", {}).get("structural", {}).get("enforce_c1a_only", False):
+        c1 = make_c1a_nested_trig(config)
+    else:
+        c1 = make_c1_structural(config)
+
     constraints = [
-        make_c1_structural(config),
+        c1,
         make_c2_depth(config),
         make_c3_operator(config),
         make_c4_positivity(config),

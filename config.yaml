@@ -26,6 +26,7 @@ constraints:
   structural:
     max_nested_trig: 1          # no nested sin(cos(...))
     max_consecutive_binary: 3
+    enforce_c1a_only: true      # If true, ignores max_consecutive_binary (C1b) in PySR+metric
   depth:
     limit: 6
   operator_whitelist:

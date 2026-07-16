@@ -151,4 +151,22 @@
 
 **Blocking Issue 3 (Sampling vs Search Distribution):** PySR does not expose generation-1 expressions. `model.equations_` is a Pareto-front Hall of Fame only (8–10 equations), not the full population. There is no API to extract all evaluated expressions. This issue is downgraded from BLOCKING to DOCUMENTED. The HoF audit is the best available proxy.
 
+---
+
+### Entry 12: Sampling vs Search Distribution — Audited
+**Date:** 16/07/2026
+
+- **Concern (Blocking Issue 3):** The theoretical constraint density $\rho(C_i)$ is computed under uniform Monte Carlo sampling, but PySR uses evolutionary search. If the actual search distribution wildly diverges (orders of magnitude) from the theoretical one, $M(i,j)$ loses predictive power.
+- **Empirical test:** As PySR does not expose generation-0/1 expressions, we used a proxy: run a 1-iteration PySR baseline across 5 seeds on the `polynomial` dataset and evaluate constraint satisfaction on the 60 extracted Hall-of-Fame (Pareto-front) expressions.
+- **Results (`scripts/distribution_audit.py`):**
+
+| Constraint | MC Rho | Empirical HoF Rho | Ratio (Emp/MC) |
+|---|---|---|---|
+| C1a | 0.3400 | 1.0000 | 2.94x |
+| C2 | 0.4370 | 0.9500 | 2.17x |
+| C3 | 0.2250 | 0.5500 | 2.44x |
+| C4 | 0.2330 | 0.2833 | 1.22x |
+
+- **Conclusion:** The divergence is strictly less than an order of magnitude (maximum 2.94x for C1a). This is a tolerable divergence for directional predictive power. The MC $\rho$ serves as a consistent, conservative estimate of constraint density. Documented in PRD §12.
+
 
