@@ -97,3 +97,24 @@
 - **Why?** SymPy evaluates PySR's output as an n-ary flattened tree: `Add(Mul(v, m, v, 0.5), -1.263...)`. The `Mul` node has **4** arguments. Our structural constraint C1b dictates `max_consecutive_binary=3`. Since PySR lacks an internal mechanism to restrict sibling counts during its search, it output a mathematically correct but structurally violating equation.
 - This perfectly validates the architectural decision to include strict post-hoc compliance checks and empirically confirms the "M ≠ S" (Measurement vs. Search) gap documented in the PRD. We now have real, reproducible data to write about in the handbook.
 
+---
+
+### Entry 09: Early-Stop Smoke Test — S(i,j) Signal Validation
+**Date:** 16/07/2026
+
+- **Blocking concern:** Without `early_stop_condition`, PySR terminates at `niterations` regardless of convergence quality. Wall-clock time would be constant across scenarios (~35s each), and $S(i,j)$ would collapse to ~1 for all pairs. This would silently invalidate the entire empirical arm.
+- **Fix applied:** Wired `early_stop_condition = "f(loss, complexity) = (loss < 1e-6) && (complexity < 25)"` in `config.yaml` and `experiments.py`.
+- **Empirical verification** on `polynomial` dataset (2x² + 3xy - y + 5):
+
+| Scenario | Wall-clock (s) | Best Loss | Recovered |
+|---|---|---|---|
+| baseline | 11.68 | 7.16e-07 | True |
+| C3 (+,-,* only) | 2.37 | 4.64e-12 | True |
+| C2 (maxdepth=6) | 0.79 | 5.77e-12 | True |
+| C2+C3 | 0.41 | 5.11e-12 | True |
+
+- **Result:** 28.5× max/min ratio, 121% coefficient of variation in wall-clock. Early stop fires; constrained runs converge dramatically faster. The joint constraint (C2+C3 at 0.41s) is faster than either single constraint, which is exactly the synergy signal $S(i,j)$ is designed to capture.
+- **Execution model confirmed:** The orchestrator loop runs all scenarios sequentially in a single process (`for dataset → for scenario → for seed`). No joblib/multiprocessing. JIT warmup is paid once at the first `model.fit()` and shared across all subsequent calls. This means seed-paired ratios do NOT perfectly cancel JIT warmup — the first scenario (baseline, first seed) absorbs most of the overhead.
+- **JIT diagnostic recommended for `analysis.py`:** Add a check of wall-clock by execution order (row index in CSV), not just by seed, to empirically verify whether JIT distortion is concentrated in the first few rows.
+
+
