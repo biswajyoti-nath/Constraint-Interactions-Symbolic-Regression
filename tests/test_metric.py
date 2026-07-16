@@ -8,16 +8,15 @@ import json
 import math
 import pathlib
 import sys
-import time
 
 import numpy as np
 import pytest
-from sympy import sympify, Add, Mul, Symbol
+from sympy import sympify, Add, Symbol
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
 
 from expr_generator import GrammarGenerator
-from metric import DensityEstimator, InteractionMatrix, BootstrapCI, RhoResult, run_benchmark
+from metric import DensityEstimator, InteractionMatrix, RhoResult, run_benchmark
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -33,7 +32,6 @@ def gen():
 
 
 class TestDensityEstimator:
-
     def test_rho_trivial_true_constraint(self, gen):
         """Always-true constraint must produce rho = 1.0."""
         est = DensityEstimator(gen, max_depth=3)
@@ -78,7 +76,9 @@ class TestDensityEstimator:
 
         # Confirm it is NOT 2*x
         x = Symbol("x")
-        assert expr != 2 * x, "Expression was auto-simplified to 2*x — evaluate=False violated."
+        assert expr != 2 * x, (
+            "Expression was auto-simplified to 2*x — evaluate=False violated."
+        )
 
     def test_n_actual_equals_n(self, gen):
         """N_actual must equal the requested N for well-behaved depth."""
@@ -93,7 +93,6 @@ class TestDensityEstimator:
 
 
 class TestInteractionMatrix:
-
     def _make_rho(self, rho_i_vals, rho_ij_vals):
         """Helper: construct a RhoResult from lists."""
         k = len(rho_i_vals)
@@ -107,7 +106,9 @@ class TestInteractionMatrix:
         """M[i][j] must equal M[j][i] for all pairs (DESIGN_CONTEXT §6.3)."""
         rho = self._make_rho([0.5, 0.4], {(0, 1): 0.2})
         M = InteractionMatrix().compute(rho)
-        assert M[0][1] == M[1][0], f"Symmetry violated: M[0][1]={M[0][1]}, M[1][0]={M[1][0]}"
+        assert M[0][1] == M[1][0], (
+            f"Symmetry violated: M[0][1]={M[0][1]}, M[1][0]={M[1][0]}"
+        )
 
     def test_independent_constraints(self):
         """Independent constraints (rho_ij = rho_i * rho_j) → M ≈ 1.0."""
@@ -197,7 +198,7 @@ class TestBenchmark1k:
     def test_benchmark_json_written(self, gen, tmp_path):
         """Benchmark must write a valid JSON file with required keys."""
         out = tmp_path / "benchmark_1k.json"
-        record = run_benchmark(gen, N=100, max_depth=3, output_path=str(out))
+        run_benchmark(gen, N=100, max_depth=3, output_path=str(out))
 
         assert out.exists(), "benchmark JSON file was not created"
         with open(out) as f:

@@ -33,6 +33,7 @@ from constraints import (
 # Layer 1: Dataset Loaders
 # ---------------------------------------------------------------------------
 
+
 def load_feynman_ke(n_samples=200, seed=42):
     """Load kinetic energy dataset: KE = 0.5 * m * v^2."""
     rng = np.random.default_rng(seed)
@@ -108,6 +109,7 @@ DATASET_FEATURE_NAMES = {
 # Layer 2: PySR Constraint Mapper & Composer
 # ---------------------------------------------------------------------------
 
+
 def merge_nested_constraints(d1, d2):
     """Deep merge two nested constraints dicts, taking min of limits for overlapping pairs."""
     if not d1:
@@ -134,8 +136,12 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
     # 1. Start with base kwargs from config.yaml -> pysr section
     pysr_cfg = config.get("pysr", {})
     kwargs = {
-        "binary_operators": list(pysr_cfg.get("binary_operators", ["+", "-", "*", "/"])),
-        "unary_operators": list(pysr_cfg.get("unary_operators", ["sin", "cos", "exp", "log"])),
+        "binary_operators": list(
+            pysr_cfg.get("binary_operators", ["+", "-", "*", "/"])
+        ),
+        "unary_operators": list(
+            pysr_cfg.get("unary_operators", ["sin", "cos", "exp", "log"])
+        ),
         "population_size": pysr_cfg.get("population_size", 33),
         "niterations": pysr_cfg.get("niterations", 100),
         "maxsize": pysr_cfg.get("maxsize", 25),
@@ -186,13 +192,19 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
         allowed_ops = whitelists[0]
         for w in whitelists[1:]:
             allowed_ops = allowed_ops.intersection(w)
-        kwargs["binary_operators"] = [op for op in kwargs["binary_operators"] if op in allowed_ops]
-        kwargs["unary_operators"] = [op for op in kwargs["unary_operators"] if op in allowed_ops]
+        kwargs["binary_operators"] = [
+            op for op in kwargs["binary_operators"] if op in allowed_ops
+        ]
+        kwargs["unary_operators"] = [
+            op for op in kwargs["unary_operators"] if op in allowed_ops
+        ]
 
     # Apply elementwise loss penalties
     if penalties:
         penalty_str = " + ".join(penalties)
-        kwargs["elementwise_loss"] = f"loss(prediction, target) = (prediction - target)^2 + {penalty_str}"
+        kwargs["elementwise_loss"] = (
+            f"loss(prediction, target) = (prediction - target)^2 + {penalty_str}"
+        )
 
     return kwargs
 
@@ -200,6 +212,7 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 # Layer 3: Scenario Runner
 # ---------------------------------------------------------------------------
+
 
 def _levenshtein_distance_dp(s1: str, s2: str) -> int:
     """Compute exact Levenshtein distance between two strings using standard DP."""
@@ -225,7 +238,8 @@ def normalized_edit_distance(s1: str, s2: str) -> float:
     if not s1_clean and not s2_clean:
         return 0.0
     try:
-        import Levenshtein
+        import Levenshtein  # type: ignore
+
         dist = Levenshtein.distance(s1_clean, s2_clean)
     except ImportError:
         dist = _levenshtein_distance_dp(s1_clean, s2_clean)
@@ -238,13 +252,15 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
     pysr_kwargs = build_pysr_kwargs(config, active_constraints)
 
     # Add determinism and run options
-    pysr_kwargs.update({
-        "deterministic": True,
-        "parallelism": "serial",
-        "random_state": seed,
-        "verbosity": 0,
-        "progress": False,
-    })
+    pysr_kwargs.update(
+        {
+            "deterministic": True,
+            "parallelism": "serial",
+            "random_state": seed,
+            "verbosity": 0,
+            "progress": False,
+        }
+    )
 
     # Prepare features
     features = DATASET_FEATURE_NAMES.get(dataset_name)
@@ -276,7 +292,16 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
         }
 
     # Extract best expression (last row in HOF / equations_ dataframe)
-    best_row = model.equations_.iloc[-1]
+    equations = model.equations_
+    if equations is None:
+        raise ValueError("Model has not been fitted or equations_ is None")
+
+    if isinstance(equations, list):
+        eq_df = equations[0]
+    else:
+        eq_df = equations
+
+    best_row = eq_df.iloc[-1]
     best_expr_str = str(best_row["equation"])
     best_sympy = best_row["sympy_format"]
     best_loss = float(best_row["loss"])
@@ -284,8 +309,8 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
 
     # Compute recovery metrics on test set
     try:
-        y_pred = model.predict(X_test, index=len(model.equations_) - 1)
-        mse = float(mean_squared_error(y_test, y_pred))
+        y_pred = model.predict(X_test, index=len(equations) - 1)
+        mse = mean_squared_error(y_test, y_pred)
         var_y = float(np.var(y_test))
         relative_mse = mse / var_y if var_y > 0 else np.inf
     except Exception:
@@ -293,7 +318,7 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
         relative_mse = np.nan
 
     ned = normalized_edit_distance(best_expr_str, ground_truth)
-    recovered = bool((ned < 0.1) or (relative_mse is not None and relative_mse < 1e-6))
+    recovered = (ned < 0.1) or (relative_mse is not None and relative_mse < 1e-6)
 
     # Post-hoc constraint compliance checks
     compliance = {}
@@ -337,6 +362,7 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
 # Layer 4: Experiment Orchestrator
 # ---------------------------------------------------------------------------
 
+
 def flatten_result(res: dict) -> dict:
     """Flatten results dict to map compliance checks to individual columns."""
     flat = res.copy()
@@ -356,7 +382,7 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
 
     seeds = config.get("experiments", {}).get("seeds", [42, 123, 456, 789, 1024])
     seed_hash = hashlib.sha256(str(seeds).encode("utf-8")).hexdigest()[:8]
-    run_id = f"{datetime.datetime.utcnow():%Y%m%d_%H%M%S}_{seed_hash}"
+    run_id = f"{datetime.datetime.now(datetime.timezone.utc):%Y%m%d_%H%M%S}_{seed_hash}"
 
     # 2. Create results directory
     results_dir = pathlib.Path("results") / run_id
@@ -364,9 +390,13 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
 
     # Get Git commit hash
     try:
-        git_commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
-        ).decode("utf-8").strip()
+        git_commit = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+            )
+            .decode("utf-8")
+            .strip()
+        )
     except Exception:
         git_commit = "unknown"
 
@@ -383,7 +413,7 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
         "git_commit": git_commit,
         "config_sha256": config_sha256,
         "seeds": seeds,
-        "timestamp_utc": datetime.datetime.utcnow().isoformat(),
+        "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "python_version": sys.version,
         "packages": {
             "pysr": pysr.__version__,
@@ -418,9 +448,15 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
     datasets = ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"]
     scenarios = [
         [],
-        ["C1"], ["C2"], ["C3"], ["C4"],
-        ["C1", "C2"], ["C1", "C3"], ["C1", "C4"],
-        ["C2", "C3"], ["C2", "C4"],
+        ["C1"],
+        ["C2"],
+        ["C3"],
+        ["C4"],
+        ["C1", "C2"],
+        ["C1", "C3"],
+        ["C1", "C4"],
+        ["C2", "C3"],
+        ["C2", "C4"],
         ["C3", "C4"],
         ["C1", "C2", "C3", "C4"],
     ]
@@ -473,7 +509,9 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
                     completed += 1
 
     # Update metadata with end timestamp
-    metadata["timestamp_completed_utc"] = datetime.datetime.utcnow().isoformat()
+    metadata["timestamp_completed_utc"] = datetime.datetime.now(
+        datetime.timezone.utc
+    ).isoformat()
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=4)
 

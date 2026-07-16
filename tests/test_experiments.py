@@ -15,7 +15,10 @@ from src.experiments import (
 # 1. Loader Tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"])
+
+@pytest.mark.parametrize(
+    "loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"]
+)
 def test_loader_determinism(loader_name):
     loader = LOADERS[loader_name]
     # Call twice with same seed
@@ -29,7 +32,9 @@ def test_loader_determinism(loader_name):
     assert gt1 == gt2
 
 
-@pytest.mark.parametrize("loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"])
+@pytest.mark.parametrize(
+    "loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"]
+)
 def test_loader_shapes(loader_name):
     loader = LOADERS[loader_name]
     X_train, y_train, X_test, y_test, gt = loader(n_samples=100, seed=42)
@@ -40,7 +45,9 @@ def test_loader_shapes(loader_name):
     assert y_test.shape == (20,)
 
 
-@pytest.mark.parametrize("loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"])
+@pytest.mark.parametrize(
+    "loader_name", ["feynman_ke", "feynman_coulomb", "polynomial", "srsd_dummy"]
+)
 def test_loader_ground_truth(loader_name):
     loader = LOADERS[loader_name]
     X_train, y_train, X_test, y_test, gt = loader(n_samples=50, seed=42)
@@ -60,6 +67,7 @@ def test_loader_ground_truth(loader_name):
 # ---------------------------------------------------------------------------
 # 2. Constraint Mapper Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_config():
@@ -122,7 +130,9 @@ def test_build_pysr_kwargs_c3(mock_config):
 def test_build_pysr_kwargs_c4(mock_config):
     kwargs = build_pysr_kwargs(mock_config, ["C4"])
     assert "elementwise_loss" in kwargs
-    assert "10.0 * (prediction < 0.0 ? prediction^2 : 0.0)" in kwargs["elementwise_loss"]
+    assert (
+        "10.0 * (prediction < 0.0 ? prediction^2 : 0.0)" in kwargs["elementwise_loss"]
+    )
 
 
 def test_build_pysr_kwargs_c1_c3_merge(mock_config):
@@ -156,6 +166,7 @@ def test_build_pysr_kwargs_all(mock_config):
 # ---------------------------------------------------------------------------
 # 3. NED Tests
 # ---------------------------------------------------------------------------
+
 
 def test_levenshtein_distance_dp():
     assert _levenshtein_distance_dp("", "") == 0

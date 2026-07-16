@@ -10,7 +10,6 @@ See DESIGN_CONTEXT.md §0.
 """
 
 import json
-import math
 import pathlib
 import sys
 import time
