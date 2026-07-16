@@ -48,7 +48,13 @@ def load_feynman_ke(n_samples=200, seed=42):
 
 
 def load_feynman_coulomb(n_samples=200, seed=42):
-    """Load Coulomb's Law dataset: F = q1 * q2 / (4 * pi * eps0 * r^2)."""
+    """Load Coulomb's Law dataset: F = q1 * q2 / (4 * pi * eps0 * r^2).
+
+    Note: Raw y values are ~10^10 (Newtons at SI scale). y is z-score standardized
+    before returning so PySR's MSE loss is well-scaled. The ground_truth string
+    reflects the standardized target. Recovery (relative_mse < 1e-6) is measured
+    on the standardized scale. This is BIAS-Issue3 fix (see LOGBOOK Entry 08).
+    """
     rng = np.random.default_rng(seed)
     q1 = rng.uniform(0.1, 5.0, n_samples)
     q2 = rng.uniform(0.1, 5.0, n_samples)
@@ -56,11 +62,16 @@ def load_feynman_coulomb(n_samples=200, seed=42):
     X = np.stack([q1, q2, r], axis=1)
     eps0 = 8.854e-12
     denom = 4 * np.pi * eps0
-    y = (q1 * q2) / (denom * r**2)
+    y_raw = (q1 * q2) / (denom * r**2)
+    # Z-score standardize y to prevent MSE loss collapse on 10^10-scale targets
+    y_mean = float(y_raw.mean())
+    y_std = float(y_raw.std())
+    y = (y_raw - y_mean) / y_std
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=seed
     )
-    return X_train, y_train, X_test, y_test, f"q1 * q2 / ({denom} * r**2)"
+    # Ground truth is in standardized units; recovery uses relative_mse on this scale
+    return X_train, y_train, X_test, y_test, "(q1 * q2) / (r**2)  # standardized"
 
 
 def load_polynomial(n_samples=200, seed=42):
@@ -132,7 +143,14 @@ def merge_nested_constraints(d1, d2):
 
 
 def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
-    """Compose PySR Regressor keyword arguments by applying active constraints."""
+    """Compose PySR Regressor keyword arguments by applying active constraints.
+
+    CRITICAL: early_stop_condition is required for wall-clock time to be a meaningful
+    proxy for S(i,j). Without it, all runs terminate at niterations (a fixed iteration
+    count), and wall-clock time reflects only that — not constraint-driven convergence
+    speed. With early_stop_condition set, PySR stops as soon as a loss threshold is
+    met, so faster convergence under tighter constraints IS captured by wall-clock.
+    """
     # 1. Start with base kwargs from config.yaml -> pysr section
     pysr_cfg = config.get("pysr", {})
     kwargs = {
@@ -150,6 +168,15 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
     # Map timeout_seconds to timeout_in_seconds if present
     if "timeout_seconds" in pysr_cfg:
         kwargs["timeout_in_seconds"] = float(pysr_cfg["timeout_seconds"])
+
+    # Wire early_stop_condition: required for wall-clock to vary meaningfully by scenario.
+    # Accepts a float (loss threshold) or a Julia string function from config.
+    # Default Julia string: stop when relative MSE < 1e-6 AND complexity < maxsize.
+    early_stop = pysr_cfg.get(
+        "early_stop_condition",
+        f'f(loss, complexity) = (loss < 1e-6) && (complexity < {pysr_cfg.get("maxsize", 25)})',
+    )
+    kwargs["early_stop_condition"] = early_stop
 
     # 2. Layer constraint-specific modifications
     nested_constraints = {}

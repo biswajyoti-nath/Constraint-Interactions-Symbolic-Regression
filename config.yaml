@@ -50,6 +50,10 @@ pysr:
   maxsize: 25
   binary_operators: ["+", "-", "*", "/"]
   unary_operators: ["sin", "cos", "exp", "log"]
+  # CRITICAL: early_stop_condition makes wall-clock a meaningful S(i,j) proxy.
+  # Without this, every run runs to niterations regardless of convergence quality.
+  # Julia function: stop when loss < threshold AND complexity stays reasonable.
+  early_stop_condition: "f(loss, complexity) = (loss < 1e-6) && (complexity < 25)"
 
 datasets:
   - name: "feynman_ke"

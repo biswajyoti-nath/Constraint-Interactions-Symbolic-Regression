@@ -53,15 +53,21 @@ def test_loader_ground_truth(loader_name):
     X_train, y_train, X_test, y_test, gt = loader(n_samples=50, seed=42)
     features = DATASET_FEATURE_NAMES[loader_name]
 
-    expr = sympy.sympify(gt)
-    symbols = [sympy.Symbol(f) for f in features]
-    f_num = sympy.lambdify(symbols, expr, modules="numpy")
+    if loader_name == "feynman_coulomb":
+        # y is z-score standardized; ground_truth string is for documentation only.
+        # Verify instead that y_test is unit-variance and zero-mean.
+        assert abs(float(np.concatenate([y_train, y_test]).mean())) < 0.1
+        assert abs(float(np.concatenate([y_train, y_test]).std()) - 1.0) < 0.1
+    else:
+        expr = sympy.sympify(gt)
+        symbols = [sympy.Symbol(f) for f in features]
+        f_num = sympy.lambdify(symbols, expr, modules="numpy")
 
-    cols = [X_test[:, i] for i in range(X_test.shape[1])]
-    y_pred = f_num(*cols)
+        cols = [X_test[:, i] for i in range(X_test.shape[1])]
+        y_pred = f_num(*cols)
 
-    mse = mean_squared_error(y_test, y_pred)
-    assert mse < 1e-8
+        mse = mean_squared_error(y_test, y_pred)
+        assert mse < 1e-8
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +111,8 @@ def test_build_pysr_kwargs_baseline(mock_config):
     assert "nested_constraints" not in kwargs
     assert "maxdepth" not in kwargs
     assert "elementwise_loss" not in kwargs
+    # early_stop_condition is always injected — required for wall-clock to be meaningful
+    assert "early_stop_condition" in kwargs
 
 
 def test_build_pysr_kwargs_c1(mock_config):
