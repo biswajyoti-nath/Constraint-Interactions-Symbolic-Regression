@@ -251,7 +251,7 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
     X_train, y_train, X_test, y_test, ground_truth = dataset
     pysr_kwargs = build_pysr_kwargs(config, active_constraints)
 
-    # Add determinism and run options
+    # Add determinism and run options for cluster safety
     pysr_kwargs.update(
         {
             "deterministic": True,
@@ -259,6 +259,7 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
             "random_state": seed,
             "verbosity": 0,
             "progress": False,
+            "temp_equation_file": True,  # Prevent inode exhaustion on cluster
         }
     )
 
