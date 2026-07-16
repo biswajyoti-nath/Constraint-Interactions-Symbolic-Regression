@@ -116,5 +116,39 @@
 - **Result:** 28.5× max/min ratio, 121% coefficient of variation in wall-clock. Early stop fires; constrained runs converge dramatically faster. The joint constraint (C2+C3 at 0.41s) is faster than either single constraint, which is exactly the synergy signal $S(i,j)$ is designed to capture.
 - **Execution model confirmed:** The orchestrator loop runs all scenarios sequentially in a single process (`for dataset → for scenario → for seed`). No joblib/multiprocessing. JIT warmup is paid once at the first `model.fit()` and shared across all subsequent calls. This means seed-paired ratios do NOT perfectly cancel JIT warmup — the first scenario (baseline, first seed) absorbs most of the overhead.
 - **JIT diagnostic recommended for `analysis.py`:** Add a check of wall-clock by execution order (row index in CSV), not just by seed, to empirically verify whether JIT distortion is concentrated in the first few rows.
+- **JIT exclusion implemented:** `compute_S_ij()` now drops `jit_warmup_suspect=True` rows before computing S(i,j). A sensitivity variant `exclude_jit=False` preserves the option to report both.
+
+---
+
+### Entry 10: PySR Determinism — Empirically Verified
+**Date:** 16/07/2026
+
+- **Concern:** `deterministic=True` and `random_state=seed` may not yield bit-identical behavior across Julia/Python boundaries due to threading leaks.
+- **Test:** Ran the exact same baseline configuration (seed=42, `polynomial` dataset) twice.
+- **Result:**
+  - Run 1: loss=7.1567547000e-07, eq=`(((x + ((x + y) + (y / 0.50001794))) * x) - y) + 4.999364`
+  - Run 2: loss=7.1567547000e-07, eq=`(((x + ((x + y) + (y / 0.50001794))) * x) - y) + 4.999364`
+  - **Bit-identical loss:** True
+  - **Identical equation:** True
+- **Conclusion:** PySR with `parallelism='serial'` is strictly deterministic. Runtime variance in S(i,j) reflects genuine search cost differences, not stochastic noise.
+
+---
+
+### Entry 11: Constraint Enforcement Gap — Quantified
+**Date:** 16/07/2026
+
+- **Concern (Blocking Issue 2):** The Monte Carlo density estimator enforces C1b (`max_consecutive_binary`) and SymPy n-ary depth (C2), but PySR only enforces C1a (nested trig) and its internal binary-tree `maxsize`. If PySR regularly selects C1b/C2-violating expressions, M(i,j) predicts interaction for a distribution PySR isn't actually exploring.
+- **Empirical test:** Passed all 10 Hall-of-Fame equations from a baseline `feynman_ke` run through `constraints.py`:
+
+| Constraint | Violations | Rate | Notes |
+|---|---|---|---|
+| C1 (structural) | 1/10 | 10% | Violation: `v * (log(v) * (m + m))` triggers C1b (consecutive binary) |
+| C2 (depth ≤ 6) | 0/10 | 0% | PySR's internal `maxsize=25` is looser but in practice stays within depth 6 |
+
+- **Under C1 enforcement:** Violations drop to 0/8 (0%). The `nested_constraints` mechanism correctly prevents C1a violations. C1b violations only occur in unconstrained baseline runs.
+- **Mitigation:** Added `audit_hall_of_fame()` to `experiments.py` which runs this check on every scenario. Violation rates are saved as `hof_c1_violation_rate` and `hof_c2_violation_rate` in results CSV.
+- **Handbook language:** "The theoretical density ρ(Cᵢ) is computed under uniform grammar sampling, which diverges from PySR's evolutionary search distribution. The HoF compliance audit provides partial evidence that the gap is bounded (C1b violation rate 10% in baseline, 0% under enforcement; C2 violation rate 0%). This is a known limitation (PRD §12)."
+
+**Blocking Issue 3 (Sampling vs Search Distribution):** PySR does not expose generation-1 expressions. `model.equations_` is a Pareto-front Hall of Fame only (8–10 equations), not the full population. There is no API to extract all evaluated expressions. This issue is downgraded from BLOCKING to DOCUMENTED. The HoF audit is the best available proxy.
 
 

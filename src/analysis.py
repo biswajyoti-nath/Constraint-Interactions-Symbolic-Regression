@@ -82,7 +82,16 @@ def load_and_preprocess(results_csv: pathlib.Path) -> pd.DataFrame:
         logger.warning(f"Early-stop diagnostic warning for {k}: {v['warning']}")
     return df
 
-def compute_S_ij(df: pd.DataFrame, agg_method='seed_paired') -> pd.DataFrame:
+def compute_S_ij(df: pd.DataFrame, agg_method='seed_paired',
+                  exclude_jit: bool = True) -> pd.DataFrame:
+    # Drop JIT-contaminated rows before computing any S_ij
+    if exclude_jit and 'jit_warmup_suspect' in df.columns:
+        n_before = len(df)
+        df = df[~df['jit_warmup_suspect']].copy()
+        n_dropped = n_before - len(df)
+        if n_dropped > 0:
+            logger.info(f"compute_S_ij: Dropped {n_dropped} JIT-warmup-suspect rows.")
+
     records = []
     datasets = df['dataset'].unique()
     constraints = df['constraints'].unique()

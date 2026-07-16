@@ -244,10 +244,11 @@ config.yaml  (single source of truth)
 
 **FR-EXP-05 Metrics Recorded Per Run.**
 - Wall-clock runtime (seconds). **Note: PySR v1.5.10 does not expose candidate evaluation counts. Wall-clock time is the sole search-cost proxy for S(i,j).**
-- Recovery rate (binary): NED < 0.1 **or** relative MSE < 10⁻⁶ on 20% held-out split.
+- Recovery rate (binary): NED < 0.1 **or** relative MSE < 10⁻⁶ on 20% held-out split. **This is the primary recovery criterion.** Symbolic equivalence via `check_semantic_exact()` (SymPy simplification) is available in `analysis.py` as a **secondary, exploratory** enrichment column (`semantically_exact: True/False/None`) but is NOT used to determine `recovered`. Rationale: SymPy's `simplify()` is unreliable for complex expressions (hangs, false negatives on equivalent-but-unsimplifiable forms). Numerical MSE on held-out data is the operationally reproducible criterion.
 - Solution complexity (AST node count of best expression).
 - Timeout censorship: If the timeout is hit, record `recovery=False` and `wall_clock_s = timeout`. These must be filtered from S(i,j) regression.
 - Best expression string.
+- **HoF compliance audit**: `hof_c1_violation_rate`, `hof_c2_violation_rate` — post-hoc constraint violation rates across the full Pareto front, quantifying the M(i,j) vs S(i,j) distribution gap.
 
 **FR-EXP-06 Reproducibility Logging.** Write `results/<run_id>/metadata.json` **before** run starts:
 
@@ -280,6 +281,18 @@ S(i,j) = min(evals_{C_i}, evals_{C_j}) / evals_{C_i ∧ C_j}
 **FR-ANA-03 Multiple Comparisons.** Apply Benjamini–Hochberg FDR correction at α=0.05 across all pairwise tests.
 
 **FR-ANA-04 Power Analysis.** With C(4,2)×4 = 24 (pair, dataset) data points: power analysis confirms detectability of r ≥ 0.6 at α=0.05 with power > 0.80 (`statsmodels.stats.power`).
+
+**FR-ANA-04a Power Under Attrition.** `load_and_preprocess` censors non-converged runs (timeout_hit & ~recovered → NaN). Power under realistic attrition:
+
+| Attrition | N_eff | Power (r=0.6) | Adequate? |
+|---|---|---|---|
+| 0% | 24 | 0.940 | ✅ |
+| 10% | 21 | 0.905 | ✅ |
+| 20% | 19 | 0.871 | ✅ |
+| 30% | 16 | 0.801 | ✅ |
+| 40% | 14 | 0.737 | ❌ |
+
+**Commitment:** If attrition exceeds 30% (N_eff < 16), the study cannot achieve 0.80 power at r=0.6. In this case, we will report the observed r and its bootstrap CI without making a binary significance claim.
 
 **FR-ANA-05 Figures (Publication Quality, 300 DPI).**
 1. **Interaction Heatmap**: M(i,j) matrix, `seaborn.heatmap`, coolwarm colormap, annotated cells.

@@ -241,6 +241,43 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def audit_hall_of_fame(model, config) -> dict:
+    """Pass every HoF equation through constraints.py checks.
+
+    Returns violation rates for C1 and C2 across the full Pareto front.
+    This quantifies the gap between the theoretical M(i,j) density
+    (computed under uniform grammar sampling) and PySR's actual search.
+    """
+    c1_fn = make_c1_structural(config)
+    c2_fn = make_c2_depth(config)
+
+    hof = model.equations_
+    if hof is None:
+        return {"hof_c1_violation_rate": np.nan, "hof_c2_violation_rate": np.nan,
+                "hof_total_equations": 0}
+    if isinstance(hof, list):
+        hof = hof[0]
+
+    n = len(hof)
+    c1_violations = 0
+    c2_violations = 0
+    for _, row in hof.iterrows():
+        try:
+            expr = row.get("sympy_format", sympy.sympify(row["equation"]))
+            if not c1_fn(expr):
+                c1_violations += 1
+            if not c2_fn(expr):
+                c2_violations += 1
+        except Exception:
+            pass  # Unparseable expressions are not counted
+
+    return {
+        "hof_c1_violation_rate": round(c1_violations / max(n, 1), 4),
+        "hof_c2_violation_rate": round(c2_violations / max(n, 1), 4),
+        "hof_total_equations": n,
+    }
+
+
 def _levenshtein_distance_dp(s1: str, s2: str) -> int:
     """Compute exact Levenshtein distance between two strings using standard DP."""
     m, n = len(s1), len(s2)
@@ -367,6 +404,9 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
     timeout_limit = float(config.get("pysr", {}).get("timeout_seconds", 300))
     timeout_hit = elapsed >= timeout_limit - 1.0
 
+    # Post-hoc HoF compliance audit (quantifies M vs S gap)
+    hof_audit = audit_hall_of_fame(model, config)
+
     return {
         "dataset": dataset_name,
         "constraints": ",".join(sorted(active_constraints)) or "baseline",
@@ -382,6 +422,9 @@ def run_scenario(dataset_name, dataset, active_constraints, config, seed) -> dic
         "recovered": recovered,
         "timeout_hit": timeout_hit,
         "constraints_satisfied": compliance,
+        "hof_c1_violation_rate": hof_audit["hof_c1_violation_rate"],
+        "hof_c2_violation_rate": hof_audit["hof_c2_violation_rate"],
+        "hof_total_equations": hof_audit["hof_total_equations"],
         "error": error_msg,
     }
 

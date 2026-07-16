@@ -86,6 +86,38 @@ def test_compute_S_ij():
     assert S_df.iloc[0]['S_ij'] == 2.5
     assert S_df.iloc[0]['n_valid_seeds'] == 3
 
+def test_compute_S_ij_excludes_jit():
+    """JIT-warmup-suspect rows must be excluded from S_ij computation."""
+    df = pd.DataFrame({
+        'dataset': ['d1']*9,
+        'constraints': ['C1']*3 + ['C2']*3 + ['C1+C2']*3,
+        'seed': [1, 2, 3]*3,
+        'wall_clock_s': [
+            100, 10, 10,  # C1: seed 1 is JIT-suspect (10x median)
+            5,   5,  5,   # C2
+            2,   2,  2    # C1+C2
+        ],
+        'jit_warmup_suspect': [
+            True, False, False,  # seed 1 flagged
+            False, False, False,
+            False, False, False
+        ]
+    })
+    
+    # With exclude_jit=True (default): seed 1 is dropped from C1
+    # Only seeds 2 and 3 remain -> n_valid < 3 -> no S_ij returned
+    S_df = compute_S_ij(df, exclude_jit=True)
+    assert len(S_df) == 0  # Not enough valid seeds after exclusion
+
+    # With exclude_jit=False: all 3 seeds used
+    # S_1 = min(100, 5)/2 = 2.5
+    # S_2 = min(10, 5)/2 = 2.5  
+    # S_3 = min(10, 5)/2 = 2.5
+    # Mean = 2.5
+    S_df_all = compute_S_ij(df, exclude_jit=False)
+    assert len(S_df_all) == 1
+    assert S_df_all.iloc[0]['S_ij'] == 2.5
+
 def test_correlation_analysis():
     # 24 points: 4 datasets x 6 pairs
     datasets = ['d1', 'd2', 'd3', 'd4']
