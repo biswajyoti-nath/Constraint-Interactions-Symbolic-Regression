@@ -28,6 +28,8 @@ Thumbs.db
 # Results (track selectively)
 *.png
 !figures/.gitkeep
+outputs/
+results/
 
 # Julia
 *.ji
