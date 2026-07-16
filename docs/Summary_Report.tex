@@ -1,0 +1,49 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{enumitem}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+
+\begin{document}
+
+\begin{center}
+    \LARGE\textbf{Project Summary Report}\\[0.5cm]
+\end{center}
+
+\noindent\textbf{Group Members:} Biswajyoti Nath, Subinoy Nath \\
+\textbf{Supervisor Name:} Dr. Mahapara Khureshi \\
+\textbf{Project Title:} Constraint-Interaction Metric for Symbolic Regression
+
+\vspace{0.5cm}
+
+\section*{Abstract}
+Symbolic Regression (SR) aims to discover interpretable mathematical expressions from data. To constrain the massive combinatorial search space, practitioners apply structural priors (e.g., maximum depth, operator limits). However, the interaction between multiple constraints is poorly understood. This project introduces a theoretical constraint-interaction metric, $M(i,j)$, which quantifies whether two constraints act synergistically, redundantly, or independently on the grammatical search space. Using Monte Carlo density estimation on SymPy abstract syntax trees, we derive $M(i,j)$ and empirically validate it against PySR, a state-of-the-art evolutionary symbolic regressor. The objective is to demonstrate that the theoretical metric $M(i,j)$ accurately predicts the empirical search speedup $S(i,j)$, providing a rigorously grounded framework for optimizing hyperparameter selection in symbolic regression tasks.
+
+\section*{Components required}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Theoretical Component:} A Monte Carlo sampling engine generating millions of abstract syntax trees (ASTs) to estimate the uniform grammatical density $\rho(C)$ for various structural constraints (e.g., trigonometric nesting, n-ary depth, operator whitelists).
+    \item \textbf{Empirical Component:} A large-scale experimental pipeline executing a $4 \times 12 \times 5 = 240$ scenario matrix across established physics datasets (e.g., Feynman Equations).
+    \item \textbf{Analysis Component:} A statistical module to compute Pearson correlation and $p$-values between the theoretical metric $M(i,j)$ and the empirical search cost speedups $S(i,j)$, factoring in JIT-warmup biases and right-censored timeouts.
+\end{itemize}
+
+\section*{Details of the Software/Hardware to be implemented}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Software Stack:} 
+    \begin{itemize}
+        \item \textbf{Python 3.12:} Core orchestration language.
+        \item \textbf{SymPy:} Used for the theoretical generation and evaluation of mathematical Abstract Syntax Trees (ASTs) and structural constraint parsing.
+        \item \textbf{PySR (v1.5.10) / Julia:} High-performance evolutionary symbolic regression backend used for the empirical search execution.
+        \item \textbf{SciPy, scikit-learn \& Pandas:} Used for statistical correlation analysis and dataset management.
+        \item \textbf{Git \& LaTeX:} Version control and academic reporting.
+    \end{itemize}
+    \item \textbf{Hardware Requirements:}
+    \begin{itemize}
+        \item \textbf{Compute:} Multi-core CPU environment for parallel Monte Carlo AST sampling and intensive evolutionary search evaluation (PySR natively utilizes multi-threading). 
+        \item No dedicated GPU is strictly required, as evolutionary symbolic regression operations are primarily CPU-bound for standard physics benchmark equations.
+    \end{itemize}
+\end{itemize}
+
+\end{document}
