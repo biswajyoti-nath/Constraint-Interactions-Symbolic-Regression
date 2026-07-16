@@ -85,3 +85,15 @@
 - **Dependencies**: Added `scikit-learn>=1.3` to `requirements.txt`.
 - **Testing**: Implemented `tests/test_experiments.py` covering shapes, determinism, ground truth recovery, Levenshtein fallback, and constraint merging. Test suite expanded from 60 to 83 passing tests.
 - **Documentation**: Updated `DESIGN_CONTEXT.md` (§6.4 invariants) and logged progress.
+
+---
+
+### Entry 08: Benchmark Validation & The "M ≠ S" Gap Live Observation
+**Date:** 16/07/2026
+
+- Ran a rapid benchmark test of the `feynman_ke` dataset using the baseline and `['C1']` scenarios to ensure cluster readiness.
+- **Critical Finding for Paper/Handbook (Ch. 13)**: The baseline run *successfully* recovered the kinetic energy formula `0.5 * m * v**2`, represented by PySR as `((v * m) * (v * 0.5)) - 1.2630079e-7`.
+- However, our `constraints.py` post-hoc compliance check flagged `C1_Satisfied = False`.
+- **Why?** SymPy evaluates PySR's output as an n-ary flattened tree: `Add(Mul(v, m, v, 0.5), -1.263...)`. The `Mul` node has **4** arguments. Our structural constraint C1b dictates `max_consecutive_binary=3`. Since PySR lacks an internal mechanism to restrict sibling counts during its search, it output a mathematically correct but structurally violating equation.
+- This perfectly validates the architectural decision to include strict post-hoc compliance checks and empirically confirms the "M ≠ S" (Measurement vs. Search) gap documented in the PRD. We now have real, reproducible data to write about in the handbook.
+
