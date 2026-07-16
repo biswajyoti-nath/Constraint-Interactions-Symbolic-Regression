@@ -37,3 +37,15 @@ results/
 # Agent Skills
 .agents/
 skills-lock.json
+
+# AI Assistants & Agents
+.claude/
+.codex/
+.gemini/
+.opencode/
+.orchestra-skills.json
+skills/
+
+# Data
+data/
+
