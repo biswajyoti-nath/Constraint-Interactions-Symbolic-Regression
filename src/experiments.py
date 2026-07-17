@@ -597,3 +597,5 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
 
     print(f"Experiments complete. Results saved to {results_dir}")
     return csv_path
+if __name__ == '__main__':
+    run_experiment_matrix()
