@@ -227,6 +227,25 @@ def build_pysr_kwargs(config: dict, active_constraints: list[str]) -> dict:
             op for op in kwargs["unary_operators"] if op in allowed_ops
         ]
 
+    # Prune nested_constraints to only include operators that survived the whitelist
+    # (C1+C3 combination: C3 may remove sin/cos, so remove them from nested_constraints
+    # too — otherwise PySR throws "Operator X is not in the operator set")
+    if nested_constraints and "unary_operators" in kwargs:
+        active_unary = set(kwargs["unary_operators"])
+        nested_constraints = {
+            outer: {
+                inner: limit
+                for inner, limit in inner_dict.items()
+                if inner in active_unary
+            }
+            for outer, inner_dict in nested_constraints.items()
+            if outer in active_unary
+        }
+        if nested_constraints:
+            kwargs["nested_constraints"] = nested_constraints
+        else:
+            kwargs.pop("nested_constraints", None)
+
     # Apply elementwise loss penalties
     if penalties:
         penalty_str = " + ".join(penalties)
@@ -560,24 +579,47 @@ def run_experiment_matrix(config_path="config.yaml") -> pathlib.Path:
         "c2_satisfied",
         "c3_satisfied",
         "c4_satisfied",
+        "hof_c1_violation_rate",
+        "hof_c2_violation_rate",
+        "hof_total_equations",
         "error",
     ]
 
     total_runs = len(datasets) * len(scenarios) * len(seeds)
-    completed = 0
 
-    print(f"Starting experiment run {run_id}. Total runs: {total_runs}")
+    # Check for existing completed runs if resuming
+    existing_keys = set()
+    file_exists = csv_path.exists() and csv_path.stat().st_size > 0
+    if file_exists:
+        try:
+            with open(csv_path, "r", newline="") as cf:
+                reader = csv.DictReader(cf)
+                for row in reader:
+                    existing_keys.add((row["dataset"], row["constraints"], int(row["seed"])))
+            print(f"Resuming experiment run {run_id}. Found {len(existing_keys)} already completed runs.")
+        except Exception as e:
+            print(f"Warning reading existing CSV: {e}. Starting fresh.")
+            file_exists = False
+
+    completed = len(existing_keys)
+
+    print(f"Starting experiment run {run_id}. Total runs: {total_runs} ({completed} already completed)")
 
     # Open CSV in append mode and flush after each row
-    with open(csv_path, "w", newline="") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=headers)
-        writer.writeheader()
+    mode = "a" if file_exists else "w"
+    with open(csv_path, mode, newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=headers, extrasaction="ignore")
+        if not file_exists:
+            writer.writeheader()
 
         for dataset_name in datasets:
             # Generate dataset once using the first seed (fixed data split)
             dataset = LOADERS[dataset_name](seed=seeds[0])
             for scenario in scenarios:
+                scenario_str = ",".join(sorted(scenario)) or "baseline"
                 for seed in seeds:
+                    if (dataset_name, scenario_str, seed) in existing_keys:
+                        continue
                     print(
                         f"[{completed + 1}/{total_runs}] Running {dataset_name} | "
                         f"scenario={scenario} | seed={seed}..."

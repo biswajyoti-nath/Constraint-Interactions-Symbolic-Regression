@@ -95,16 +95,16 @@ def compute_S_ij(df: pd.DataFrame, agg_method='seed_paired',
     records = []
     datasets = df['dataset'].unique()
     constraints = df['constraints'].unique()
-    single_constraints = [c for c in constraints if c != 'baseline' and '+' not in c]
+    single_constraints = [c for c in constraints if c != 'baseline' and ',' not in c]
     
     for dataset in datasets:
         ds = df[df['dataset'] == dataset]
         for i, c_i in enumerate(single_constraints):
             for j, c_j in enumerate(single_constraints):
                 if i >= j: continue
-                c_ij = f"{c_i}+{c_j}"
+                c_ij = f"{c_i},{c_j}"
                 if c_ij not in constraints:
-                    c_ij = f"{c_j}+{c_i}"
+                    c_ij = f"{c_j},{c_i}"
                     if c_ij not in constraints: continue
                 
                 if agg_method == 'seed_paired':

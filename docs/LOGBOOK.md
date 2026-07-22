@@ -170,3 +170,12 @@
 - **Conclusion:** The divergence is strictly less than an order of magnitude (maximum 2.94x for C1a). This is a tolerable divergence for directional predictive power. The MC $\rho$ serves as a consistent, conservative estimate of constraint density. Documented in PRD §12.
 
 
+
+
+### Entry 13: End-to-End Pipeline Completion & Bug Fixes
+**Date:** 23/07/2026
+
+- **Analysis Phase Bug:** `compute_S_ij` used a `+` separator for constraint pairs (e.g. `C1+C2`), whereas the PySR CSV stored them as `C1,C2`. This caused silent failures leading to an empty interaction matrix. Fixed by aligning the separator to `,`.
+- **Experiment Phase Bug (PySR Crash):** Runs combining C1 (nested structural trig) and C3 (operator whitelist) crashed with Julia `RuntimeError: Operator cos is not in the operator set`. C3 stripped trig functions from `unary_operators`, but `nested_constraints` still applied them. Fixed by adding a dynamic pruning step in `build_pysr_kwargs` to strip missing operators from `nested_constraints`.
+- **Final Execution:** Pipeline fully completed 240 experiment scenarios and successfully executed the analysis phase.
+- **Results:** Final correlation between theoretical $M_{ij}$ and empirical $S_{ij}$ resulted in Pearson r = 0.493 (p = 0.014), robustly validating the core hypothesis of the research.

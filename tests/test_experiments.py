@@ -144,8 +144,13 @@ def test_build_pysr_kwargs_c4(mock_config):
 
 
 def test_build_pysr_kwargs_c1_c3_merge(mock_config):
+    # C3 operator whitelist (+, -, *) removes all trig unary operators.
+    # Our fix prunes nested_constraints so the Julia runtime doesn't throw
+    # "Operator cos is not in the operator set".
     kwargs = build_pysr_kwargs(mock_config, ["C1", "C3"])
-    assert "nested_constraints" in kwargs
+    assert "nested_constraints" not in kwargs, (
+        "nested_constraints must be pruned when C3 strips all trig operators"
+    )
     assert kwargs["binary_operators"] == ["+", "-", "*"]
     assert kwargs["unary_operators"] == []
 
@@ -163,8 +168,12 @@ def test_build_pysr_kwargs_c2_c4_merge(mock_config):
 
 
 def test_build_pysr_kwargs_all(mock_config):
+    # C3 strips all trig unary operators → nested_constraints is pruned away.
+    # This prevents the Julia "Operator X is not in the operator set" crash.
     kwargs = build_pysr_kwargs(mock_config, ["C1", "C2", "C3", "C4"])
-    assert "nested_constraints" in kwargs
+    assert "nested_constraints" not in kwargs, (
+        "nested_constraints must be pruned when C3 strips all trig operators"
+    )
     assert kwargs["maxdepth"] == 5
     assert kwargs["binary_operators"] == ["+", "-", "*"]
     assert kwargs["unary_operators"] == []
@@ -188,3 +197,49 @@ def test_normalized_edit_distance():
     assert normalized_edit_distance("x + y", "x+y") == 0.0
     assert normalized_edit_distance("x + y", "x * y") > 0.0
     assert normalized_edit_distance("", "") == 0.0
+
+
+def test_pysr_determinism_and_hof_audit():
+    from src.experiments import run_scenario
+    # Run PySR on a very small polynomial dataset to keep it fast
+    dataset = LOADERS["polynomial"](n_samples=20, seed=42)
+    config = {
+        "pysr": {
+            "population_size": 30,
+            "niterations": 3,
+            "timeout_seconds": 10,
+            "maxsize": 10,
+            "binary_operators": ["+", "*"],
+            "unary_operators": ["sin", "cos"],
+            "early_stop_condition": "f(loss, complexity) = (loss < 1e-6)",
+        },
+        "constraints": {
+            "structural": {
+                "max_nested_trig": 1,
+                "enforce_c1a_only": True,
+            },
+            "depth": {
+                "limit": 6,
+            },
+            "operator_whitelist": {
+                "allowed": ["+", "*"],
+            },
+            "positivity": {
+                "n_test_points": 10,
+                "domain": [-5, 5],
+                "rng_seed": 0,
+            }
+        }
+    }
+    
+    res1 = run_scenario("polynomial", dataset, ["C1", "C2"], config, seed=42)
+    res2 = run_scenario("polynomial", dataset, ["C1", "C2"], config, seed=42)
+    
+    assert res1["error"] == res2["error"], f"Error discrepancy: {res1['error']} vs {res2['error']}"
+    assert res1["best_expression"] == res2["best_expression"]
+    assert (res1["best_loss"] == res2["best_loss"]) or (np.isnan(res1["best_loss"]) and np.isnan(res2["best_loss"]))
+    assert "hof_c1_violation_rate" in res1
+    assert "hof_c2_violation_rate" in res1
+    assert np.isnan(res1["hof_c1_violation_rate"]) or (res1["hof_c1_violation_rate"] >= 0)
+
+

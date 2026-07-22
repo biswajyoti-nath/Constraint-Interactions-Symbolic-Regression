@@ -56,12 +56,12 @@ def test_check_early_stop_diagnostic():
 def test_compute_S_ij():
     df = pd.DataFrame({
         'dataset': ['d1']*6,
-        'constraints': ['C1', 'C1', 'C2', 'C2', 'C1+C2', 'C1+C2'],
+        'constraints': ['C1', 'C1', 'C2', 'C2', 'C1,C2', 'C1,C2'],
         'seed': [1, 2, 1, 2, 1, 2],
         'wall_clock_s': [
             10.0, 10.0,  # C1
             5.0,  5.0,   # C2
-            2.0,  np.nan # C1+C2 -> seed 2 is censored
+            2.0,  np.nan # C1,C2 -> seed 2 is censored
         ]
     })
     # S_1: min(10, 5)/2 = 2.5
@@ -73,7 +73,7 @@ def test_compute_S_ij():
     # If we add more valid seeds
     df = pd.DataFrame({
         'dataset': ['d1']*9,
-        'constraints': ['C1']*3 + ['C2']*3 + ['C1+C2']*3,
+        'constraints': ['C1']*3 + ['C2']*3 + ['C1,C2']*3,
         'seed': [1, 2, 3]*3,
         'wall_clock_s': [
             10, 10, 10,
@@ -90,12 +90,12 @@ def test_compute_S_ij_excludes_jit():
     """JIT-warmup-suspect rows must be excluded from S_ij computation."""
     df = pd.DataFrame({
         'dataset': ['d1']*9,
-        'constraints': ['C1']*3 + ['C2']*3 + ['C1+C2']*3,
+        'constraints': ['C1']*3 + ['C2']*3 + ['C1,C2']*3,
         'seed': [1, 2, 3]*3,
         'wall_clock_s': [
             100, 10, 10,  # C1: seed 1 is JIT-suspect (10x median)
             5,   5,  5,   # C2
-            2,   2,  2    # C1+C2
+            2,   2,  2    # C1,C2
         ],
         'jit_warmup_suspect': [
             True, False, False,  # seed 1 flagged
